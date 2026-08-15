@@ -1,0 +1,4 @@
+Aqui el mejor ejemplo de testing que se me ocurre es hacer 5 clientes con threads, el quinto debiera tirar un error de conexion por que el sv 
+tiene un backlog de 4, y el quinto cliente no puede conectarse. Por otro lado, los clientes están programados para recibir el msg como input 
+a partir de ello responder 4,3,2,1 y luego cerrar la conexion. El servidor debe recibir los mensajes de los clientes 
+en el orden que fueron creados (pues ahí estpa el orden de las conexiones) y responder con un mensaje de confirmacion secuencialmente.
