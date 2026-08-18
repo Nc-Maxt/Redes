@@ -1,10 +1,10 @@
-import numpy as np
+
 
 def parse_HTTP_message(http_message: bytes):
     # Con esto llega un mensage HTTP completo en bytes, por lo que primero hay que decodificarlo a string
     http_message = http_message.decode()
     # ahora este tiene el header y el body, se debe separar en dos. Usamos como referencia el doble salto de línea
-    head, body = http_message.split("\r\n\r\n", 1)
+    head, body = http_message.split("\r\n\r\n", 2)
 
     #para el head, separaremos cada línea
     head_lines = head.split("\r\n")
@@ -15,7 +15,7 @@ def parse_HTTP_message(http_message: bytes):
 
     # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
     for line in head_lines[1:]:
-        key, value = line.split(":", 1)
+        key, value = line.split(":", 2)
         # se usa strip para eliminar espacios en blanco al inicio y al final
         HTTP_dict[key.strip()] = value.strip()
 
