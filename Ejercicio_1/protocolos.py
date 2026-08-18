@@ -15,7 +15,9 @@ def parse_HTTP_message(http_message: bytes):
 
     # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
     for line in head_lines[1:]:
-        key, value = line.split(":", 2)
+        # permitimos solo la primera separación, en caso de haber mas no se cuentan porque cor
+        # corresponden a parte del header con la info
+        key, value = line.split(":", 1)
         # se usa strip para eliminar espacios en blanco al inicio y al final
         HTTP_dict[key.strip()] = value.strip()
 

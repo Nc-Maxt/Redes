@@ -1,11 +1,6 @@
 import socket
 from protocolos import create_HTTP_message, parse_HTTP_message
 
-
-# esta función se encarga de recibir el mensaje completo desde el cliente
-# en caso de que el mensaje sea más grande que el tamaño del buffer 'buff_size', esta función va esperar a que
-# llegue el resto. Para saber si el mensaje ya llegó por completo, se busca el caracter de fin de mensaje (parte de nuestro protocolo inventado)
-
 def receive_full_message(connection_socket, buff_size):
 
     # recibimos la primera parte del mensaje
@@ -24,8 +19,9 @@ def receive_full_message(connection_socket, buff_size):
 
     # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
     for line in head_lines[1:]:
-        if (line.find(b"Content_Lenght")):
-            key, value = line.split(":", 2)
+        if (line.find(b"Content_Lenght")!=-1):
+            print(line)
+            key, value = line.split(b":")
             C_length = value.decode()
             break
 
@@ -41,18 +37,10 @@ def receive_full_message(connection_socket, buff_size):
     # finalmente retornamos el mensaje
     return head+b"\r\n\r\n"+body
 
-
-def contains_end_of_message(message, end_sequence):
-    return message.endswith(end_sequence)
-
-
-def remove_end_of_message(full_message, end_sequence):
-    index = full_message.rfind(end_sequence)
-    return full_message[:index]
-
 if __name__ == "__main__":
     # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
     buff_size = 4
+    buff_size_text = 1024
     new_socket_address = ('localhost', 8000)
 
     print('Creando socket - Servidor')
@@ -80,15 +68,15 @@ if __name__ == "__main__":
         # luego recibimos el mensaje usando la función que programamos
         # esta función entrega el mensaje en string (no en bytes) y sin el end_of_message
 
-        http_msg = receive_full_message(new_socket, buff_size)
-        print(http_msg.decode())
+        #http_msg = receive_full_message0(new_socket, buff_size, "\n")
+        http_msg = receive_full_message(new_socket, buff_size_text)
+        print(http_msg)
         recv_message = parse_HTTP_message(http_msg)
-        print(recv_message)
 
-        print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
+        print(f' -> Se ha recibido el siguiente mensaje: {http_msg}')
 
         # respondemos indicando que recibimos el mensaje
-        response_message = f"Se ha sido recibido con éxito el mensaje: {recv_message}"
+        response_message = f"Se ha sido recibido con éxito el mensaje: {http_msg}"
 
         # el mensaje debe pasarse a bytes antes de ser enviado, para ello usamos encode
         new_socket.send(response_message.encode())
