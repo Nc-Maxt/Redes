@@ -1,5 +1,3 @@
-import numpy as np
-
 def parse_HTTP_message(http_message: bytes):
     # Con esto llega un mensage HTTP completo en bytes, por lo que primero hay que decodificarlo a string
     http_message = http_message.decode()
@@ -39,7 +37,7 @@ def create_HTTP_message(data: dict):
     #Creamos el string que contendrá el mensaje HTTP completo
     http_message = ""
     # Primero agregamos la startline
-    st_l(data, http_message)
+    http_message = st_l(data, http_message)
 
     # Luego sacamos el body del diccionario
     body = data.pop('body')
@@ -57,4 +55,5 @@ def create_HTTP_message(data: dict):
 def st_l(data: dict, msg: str):
     # Armamos la startline con los datos del diccionario
     msg += f"{data.pop('método')} {data.pop('ruta')} {data.pop('versión')}\r\n"
+    return msg
         
