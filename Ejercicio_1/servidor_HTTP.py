@@ -98,6 +98,7 @@ if __name__ == "__main__":
             "Content-Length": str(len(html.encode())),
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
+            "X-ElQuePregunta": "paul0li",
             "body": html,
         }
         response_message = proto.create_HTTP_message(response_dict)
