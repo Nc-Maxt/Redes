@@ -56,7 +56,7 @@ if __name__ == "__main__":
     buff_size = 1024
     end_of_message = "\r\n\r\n" #http eol
     host = input('Ingrese el host: ')
-    new_socket_address = (f'{host}', 8000)
+    new_socket_address = (f'{host}', 80)
 
     print('Creando socket - Servidor')
     # armamos el socket
