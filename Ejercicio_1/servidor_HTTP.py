@@ -1,6 +1,6 @@
 import socket
 import protocolos as proto
-
+import json
 
 # esta función se encarga de recibir el mensaje completo desde el cliente
 # en caso de que el mensaje sea más grande que el tamaño del buffer 'buff_size', esta función va esperar a que
@@ -55,8 +55,10 @@ if __name__ == "__main__":
     # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
     buff_size = 1024
     end_of_message = "\r\n\r\n" #http eol
-    host = input('Ingrese el host: ')
-    new_socket_address = (f'{host}', 80)
+    #host = input('Ingrese el host: ')
+    #new_socket_address = (f'{host}', 80)
+    new_socket_address = ('localhost', 5001)
+
 
     print('Creando socket - Servidor')
     # armamos el socket
@@ -88,6 +90,12 @@ if __name__ == "__main__":
 
         html = open('respuesta.html', 'r').read()
 
+        with open("prohibidos.json") as file:
+            # usamos json para manejar los datos
+            data = json.load(file)
+            # leemos cada linea de los valores
+            nombre = data["nombre"]
+
         # armamos la response HTTP como diccionario, siguiendo el mismo formato que entrega parse_HTTP_message, y usamos create_HTTP_message para
         # convertirla a bytes (status line + headers + body)
         response_dict = {
@@ -98,10 +106,11 @@ if __name__ == "__main__":
             "Content-Length": str(len(html.encode())),
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
-            "X-ElQuePregunta": "paul0li",
+            "X-ElQuePregunta": f"{nombre}",
             "body": html,
         }
         response_message = proto.create_HTTP_message(response_dict)
+        print(response_message.decode())
 
         # create_HTTP_message ya retorna bytes, no hace falta volver a encode
         new_socket.send(response_message)
