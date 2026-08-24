@@ -1,4 +1,5 @@
 import socket
+import protocolos as proto
 
 
 # esta función se encarga de recibir el mensaje completo desde el cliente
@@ -12,6 +13,7 @@ def receive_full_message(connection_socket, buff_size, end_sequence):
     full_message = recv_message
 
     # verificamos si llegó el mensaje completo o si aún faltan partes del mensaje
+    # lo hacemos sin decodear, aun en bytes
     is_end_of_message = contains_end_of_message(full_message.decode(), end_sequence)
 
     # entramos a un while para recibir el resto y seguimos esperando información
@@ -24,7 +26,15 @@ def receive_full_message(connection_socket, buff_size, end_sequence):
         full_message += recv_message
 
         # verificamos si es la última parte del mensaje
+        # lo hacemos sin decodear, aun en bytes
         is_end_of_message = contains_end_of_message(full_message.decode(), end_sequence)
+
+    print(full_message)
+    # parseamos el mensaje
+    full_message = proto.parse_HTTP_message(full_message)
+    print(full_message)
+    full_message = proto.create_HTTP_message(full_message)
+    print("CREATE HTTP: ", full_message)
 
     # removemos la secuencia de fin de mensaje, esto entrega un mensaje en string
     full_message = remove_end_of_message(full_message.decode(), end_sequence)
@@ -43,9 +53,9 @@ def remove_end_of_message(full_message, end_sequence):
 
 if __name__ == "__main__":
     # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
-    buff_size = 4
-    end_of_message = "\n"
-    new_socket_address = ('localhost', 5000)
+    buff_size = 1024
+    end_of_message = "\r\n\r\n" #http eol
+    new_socket_address = ('localhost', 8000)
 
     print('Creando socket - Servidor')
     # armamos el socket
