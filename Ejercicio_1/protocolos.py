@@ -22,13 +22,18 @@ def parse_HTTP_message(http_message: bytes):
     return HTTP_dict
 
 def informacion(head_dict, start_line):
-    # Separamos la start_line en las 3 partes principales
-    # Método, ruta y versión
-    met, path, vers = start_line.split(" ", 2)
-    # los agregamos al diccionario
-    head_dict["método"] = met.strip()
-    head_dict["ruta"] = path.strip()
-    head_dict["versión"] = vers.strip()
+    # Separamos la start_line en sus 3 partes principales.
+    # Si empieza con "HTTP/" es una response (versión código razón),
+    # si no, es una request (método ruta versión)
+    primero, segundo, tercero = start_line.split(" ", 2)
+    if primero.startswith("HTTP/"):
+        head_dict["versión"] = primero.strip()
+        head_dict["código"] = segundo.strip()
+        head_dict["razón"] = tercero.strip()
+    else:
+        head_dict["método"] = primero.strip()
+        head_dict["ruta"] = segundo.strip()
+        head_dict["versión"] = tercero.strip()
 
 
 def create_HTTP_message(data: dict):
@@ -53,7 +58,11 @@ def create_HTTP_message(data: dict):
     return http_message.encode()
 
 def st_l(data: dict, msg: str):
-    # Armamos la startline con los datos del diccionario
-    msg += f"{data.pop('método')} {data.pop('ruta')} {data.pop('versión')}\r\n"
+    # Armamos la startline con los datos del diccionario.
+    # Si el diccionario tiene 'código', es una response; si no, es una request.
+    if "código" in data:
+        msg += f"{data.pop('versión')} {data.pop('código')} {data.pop('razón')}\r\n"
+    else:
+        msg += f"{data.pop('método')} {data.pop('ruta')} {data.pop('versión')}\r\n"
     return msg
         

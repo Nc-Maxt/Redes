@@ -85,11 +85,24 @@ if __name__ == "__main__":
 
         print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
-        # respondemos indicando que recibimos el mensaje
-        response_message = f"Se ha sido recibido con éxito el mensaje: {recv_message}"
+        html = open('respuesta.html', 'r').read()
 
-        # el mensaje debe pasarse a bytes antes de ser enviado, para ello usamos encode
-        new_socket.send(response_message.encode())
+        # armamos la response HTTP como diccionario, siguiendo el mismo formato que entrega parse_HTTP_message, y usamos create_HTTP_message para
+        # convertirla a bytes (status line + headers + body)
+        response_dict = {
+            "versión": "HTTP/1.1",
+            "código": "200",
+            "razón": "OK",
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Length": str(len(html.encode())),
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "body": html,
+        }
+        response_message = proto.create_HTTP_message(response_dict)
+
+        # create_HTTP_message ya retorna bytes, no hace falta volver a encode
+        new_socket.send(response_message)
 
         # cerramos la conexión
         # notar que la dirección que se imprime indica un número de puerto distinto al 5000
