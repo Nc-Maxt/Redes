@@ -1,7 +1,6 @@
-def parse_HTTP_message(http_message: bytes):
-    # Con esto llega un mensage HTTP completo en bytes, por lo que primero hay que decodificarlo a string
-    #http_message = http_message.decode()
-    # ahora este tiene el header y el body, se debe separar en dos. Usamos como referencia el doble salto de línea
+# toma un mensaje en bytes y lo transforma en un dict de bytes
+def parse_HTTP_message(http_message: bytes) -> dict[bytes]:
+    # separamos header de body
     head, body = http_message.split(b"\r\n\r\n", 1)
 
     #para el head, separaremos cada línea
@@ -21,22 +20,22 @@ def parse_HTTP_message(http_message: bytes):
     HTTP_dict["body"] = body
     return HTTP_dict
 
-def informacion(head_dict, start_line):
+def informacion(head_dict: dict, start_line: bytes) -> None:
     # Separamos la start_line en sus 3 partes principales.
     # Si empieza con "HTTP/" es una response (versión código razón),
     # si no, es una request (método ruta versión)
     primero, segundo, tercero = start_line.split(b" ", 2)
     if primero.decode().startswith("HTTP/"):
-        head_dict["versión"] = primero.strip()
-        head_dict["código"] = segundo.strip()
-        head_dict["razón"] = tercero.strip()
+        head_dict["versión"] = primero.strip() #"HTTP/1.1"
+        head_dict["código"] = segundo.strip() # 200
+        head_dict["razón"] = tercero.strip() # "OK"
     else:
-        head_dict["método"] = primero.strip()
-        head_dict["ruta"] = segundo.strip()
-        head_dict["versión"] = tercero.strip()
+        head_dict["método"] = primero.strip() # "GET"
+        head_dict["ruta"] = segundo.strip() # "/"
+        head_dict["versión"] = tercero.strip() # "HTTP/1.1"
 
 
-def create_HTTP_message(data: dict):
+def create_HTTP_message(data: dict[bytes]) -> bytes:
     # recibimos la estructura de datos enviada por parse_HTTP y lo convertimos en una cadena de texto con el formato HTTP
 
     #Creamos el string que contendrá el mensaje HTTP completo
@@ -52,17 +51,18 @@ def create_HTTP_message(data: dict):
         http_message += f"{key.decode()}: {data[key].decode()}\r\n"
 
     # Agregamos el body
-    http_message += f"\r\n{body.decode()}"
+    http_message = http_message + b"\r\n" + body
 
     # Retornamos el mensaje HTTP completo en bytes
-    return http_message.encode()
+    return http_message
 
-def st_l(data: dict, msg: bytes):
+def st_l(data: dict, msg: bytes) -> str:
     # Armamos la startline con los datos del diccionario.
     # Si el diccionario tiene 'código', es una response; si no, es una request.
     if "código" in data:
-        msg += f"{data.pop('versión').decode()} {data.pop('código').decode()} {data.pop('razón').decode()}\r\n"
+        msg += data.pop('versión') + b" " + data.pop('código') + b" " data.pop('razón') + b"\r\n"
     else:
-        msg += f"{data.pop('método').decode()} {data.pop('ruta').decode()} {data.pop('versión').decode()}\r\n"
+        msg += data.pop('método') + data.pop('ruta') + b" " + data.pop('versión').decode()}\r\n"
     return msg
+
         
