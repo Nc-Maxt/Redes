@@ -106,6 +106,7 @@ if __name__ == "__main__":
             # usamos json para manejar los datos
             data_json = json.load(file)
             prohibidos = data_json["blocked"]
+            elquepregunta = data_json["user"]
 
         html = open('assets/respuesta.html', 'r').read()
 
@@ -129,7 +130,9 @@ if __name__ == "__main__":
                 
             # armamos la response HTTP como diccionario, siguiendo el mismo formato que entrega parse_HTTP_message, y usamos create_HTTP_message para
             # convertirla a bytes (status line + headers + body)
+            recv_message[b"X-ElQuePregunta"] = elquepregunta.encode() #anado header personalizado a la request que mando al server. 
             response_message = proto.create_HTTP_message(recv_message)
+
             print(f"MENSAJE QUE VAMOS A HACERLE ECHO: {response_message}")
 
             # create_HTTP_message ya retorna bytes, no hace falta volver a encode
