@@ -48,7 +48,7 @@ def create_HTTP_message(data: dict[bytes]) -> bytes:
 
     #Luego agregamos los headers
     for key in data.keys():
-        http_message += f"{key.decode()}: {data[key].decode()}\r\n"
+        http_message += key + b": " + data[key]+ b"\r\n"
 
     # Agregamos el body
     http_message = http_message + b"\r\n" + body

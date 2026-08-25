@@ -47,7 +47,8 @@ def receive_mes(connection_socket, buff_size) -> dict:
 
 if __name__ == "__main__":
 
-    path_prohibidos = str(sys.args[0])
+    path_prohibidos = sys.argv[1]
+    print(path_prohibidos)
     # definimos el tamaño del buffer de recepción y el socket donde estaremos escuchando
     # cuando el proxy actue como servidor
     buff_size = 1024
@@ -89,15 +90,12 @@ if __name__ == "__main__":
 
         with open(path_prohibidos) as file:
             # usamos json para manejar los datos
-            data = json.load(file)
-            prohibidos = []
-            # leemos cada linea de los valores
-            for key,value in data:
-                prohibidos.append(value)
+            data_json = json.load(file)
+            prohibidos = data_json["blocked"]
 
         html = open('respuesta.html', 'r').read()
 
-        if host in prohibidos["blocked"]:
+        if host in prohibidos:
             response_dict = {
                 "versión": "HTTP/1.1",
                 "código": "403",
@@ -108,7 +106,7 @@ if __name__ == "__main__":
                 "Access-Control-Allow-Origin": "*",
                 "body": html,
             }
-            response_message2= = proto.create_HTTP_message(response_dict)
+            response_message2 = proto.create_HTTP_message(response_dict)
 
         else:
 
@@ -122,12 +120,13 @@ if __name__ == "__main__":
 
             # create_HTTP_message ya retorna bytes, no hace falta volver a encode
             client_socket.send(response_message)
-            response_message2 = receive_mes(client_socket, buff_size)
+            recv_message2 = receive_mes(client_socket, buff_size)
+            response_message2 = proto.create_HTTP_message(recv_message2)
 
             print(f"MENSAJE QUE recibimos DE VUELTA: {response_message2}")
 
         # y ahora hacemos echo de lo que nos respondio el server, o bien de nuestro mensaje de error. 
-        server_socket.send(response_message2)
+        new_socket.send(response_message2)
 
         # cerramos la conexión
         # notar que la dirección que se imprime indica un número de puerto distinto al 5000
