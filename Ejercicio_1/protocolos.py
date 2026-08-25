@@ -39,7 +39,7 @@ def create_HTTP_message(data: dict[bytes]) -> bytes:
     # recibimos la estructura de datos enviada por parse_HTTP y lo convertimos en una cadena de texto con el formato HTTP
 
     #Creamos el string que contendrá el mensaje HTTP completo
-    http_message = ""
+    http_message = b""
     # Primero agregamos la startline
     http_message = st_l(data, http_message)
 
@@ -56,13 +56,13 @@ def create_HTTP_message(data: dict[bytes]) -> bytes:
     # Retornamos el mensaje HTTP completo en bytes
     return http_message
 
-def st_l(data: dict, msg: bytes) -> str:
+def st_l(data: dict, msg: bytes) -> bytes:
     # Armamos la startline con los datos del diccionario.
     # Si el diccionario tiene 'código', es una response; si no, es una request.
     if "código" in data:
-        msg += data.pop('versión') + b" " + data.pop('código') + b" " data.pop('razón') + b"\r\n"
+        msg = msg + data.pop('versión') + b" " + data.pop('código') + b" " + data.pop('razón') + b"\r\n"
     else:
-        msg += data.pop('método') + data.pop('ruta') + b" " + data.pop('versión').decode()}\r\n"
+        msg = msg + data.pop('método') + data.pop('ruta') + b" " + data.pop('versión') + b"\r\n"
     return msg
 
         
