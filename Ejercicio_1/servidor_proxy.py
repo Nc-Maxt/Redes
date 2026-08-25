@@ -24,17 +24,23 @@ def it_receive_full_message(connection_socket, buff_size) -> bytes:
             key, value = line.split(b":")
             C_length = value.decode()            
 
+    #contador de ciclos para leer respuestas
+    ciclos = 1 #caso first message
+
     # entramos a un while para recibir el resto y seguimos esperando información
     # mientras que el tamano del body no sea el largo declarado
-    while not (int(C_length) == len(body)):
-        # recibimos un nuevo trozo del mensaje
-        recv_message = connection_socket.recv(buff_size)
-        
-        # lo añadimos al mensaje "completo"
-        body += recv_message
+    if int(C_length) > 0:
+        while not (int(C_length) == len(body)):
+            # recibimos un nuevo trozo del mensaje
+            recv_message = connection_socket.recv(buff_size)
+            
+            # lo añadimos al mensaje "completo"
+            body += recv_message
+            ciclos+=1
 
     full = head+b"\r\n\r\n"+body
     # finalmente retornamos el mensaje en bytes
+    print(f"Se necesitaron {ciclos} ciclos.")
     return full
 
 # empaquetamos el receive message iterativo para parsear el mensaje HTTP y devolver un diccionario
@@ -61,8 +67,6 @@ if __name__ == "__main__":
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     ################
     
-    print('Creando sockets - Socket cliente')
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #este hace el request al server
 
     # le indicamos al server socket que debe atender peticiones en la dirección address
     # para ello usamos bind
@@ -74,6 +78,9 @@ if __name__ == "__main__":
     # nos quedamos esperando a que llegue una petición de conexión
     print('... Esperando clientes')
     while True:
+        print("Nueva peticion: ")
+        print('Creando sockets - Socket cliente')
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #este hace el request al server
         # cuando llega una petición de conexión la aceptamos
         # y se crea un nuevo socket que se comunicará con el cliente
         new_socket, new_socket_address = server_socket.accept()
@@ -82,29 +89,36 @@ if __name__ == "__main__":
         # esta función entrega el mensaje comoo un diccionario en bytes
         recv_message = receive_mes(new_socket, buff_size)
         # el cliente nos envio un mensaje con el host al que quiere conectarse, y al cual, como proxy, tenemos que hacerle una request
-        host = recv_message["ruta"].decode()
-        _, host = host.split("://",1)
-        host = host[:-1]
+        # la ruta viene como URI absoluta (http://example.com/loquesea), asi que le sacamos
+        # el esquema y despues separamos el host de la ruta en el primer "/"
+        uri = recv_message[b"path"].decode()
+        # si no viene el esquema, partition deja el separador vacio y el "antes" es la uri
+        # completa, asi que en ese caso nos quedamos con la uri tal cual
+        _, sep, resto = uri.partition("://")
+        if sep == "":
+            resto = uri
+        host, _, ruta = resto.partition("/") #algo.com, /, otracosa 
+
         address = (host, 80)
-        recv_message["ruta"] = b"/" 
+        recv_message[b"path"] = ("/" + ruta).encode()
 
         with open(path_prohibidos) as file:
             # usamos json para manejar los datos
             data_json = json.load(file)
             prohibidos = data_json["blocked"]
 
-        html = open('respuesta.html', 'r').read()
+        html = open('assets/respuesta.html', 'r').read()
 
-        if host in prohibidos:
+        if resto in prohibidos:
             response_dict = {
-                "versión": "HTTP/1.1",
-                "código": "403",
-                "razón": "OK",
-                "Content-Type": "text/html; charset=utf-8",
-                "Content-Length": str(len(html.encode())),
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-                "body": html,
+                b"version": b"HTTP/1.1",
+                b"response": b"403",
+                b"reason": b"OK",
+                b"Content-Type": b"text/html; charset=utf-8",
+                b"Content-Length": str(len(html.encode())).encode(),
+                b"Connection": b"keep-alive",
+                b"Access-Control-Allow-Origin": b"*",
+                b"body": html.encode(),
             }
             response_message2 = proto.create_HTTP_message(response_dict)
 
@@ -124,6 +138,7 @@ if __name__ == "__main__":
             response_message2 = proto.create_HTTP_message(recv_message2)
 
             print(f"MENSAJE QUE recibimos DE VUELTA: {response_message2}")
+            client_socket.close()
 
         # y ahora hacemos echo de lo que nos respondio el server, o bien de nuestro mensaje de error. 
         new_socket.send(response_message2)
@@ -131,6 +146,6 @@ if __name__ == "__main__":
         # cerramos la conexión
         # notar que la dirección que se imprime indica un número de puerto distinto al 5000
         new_socket.close()
-        #print(f"conexión con {new_socket_address} ha sido cerrada")
+        print(f"conexión con {new_socket_address} ha sido cerrada")
 
         # seguimos esperando por si llegan otras conexiones
