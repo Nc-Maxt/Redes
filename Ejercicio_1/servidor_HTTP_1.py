@@ -2,54 +2,47 @@ import socket
 import protocolos as proto
 import json
 
-# esta función se encarga de recibir el mensaje completo desde el cliente
-# en caso de que el mensaje sea más grande que el tamaño del buffer 'buff_size', esta función va esperar a que
-# llegue el resto. Para saber si el mensaje ya llegó por completo, se busca el caracter de fin de mensaje (parte de nuestro protocolo inventado)
-
-def receive_full_message(connection_socket, buff_size, end_sequence):
+def it_receive_full_message(connection_socket, buff_size):
 
     # recibimos la primera parte del mensaje
-    recv_message = connection_socket.recv(buff_size)
-    full_message = recv_message
+    first_message = connection_socket.recv(buff_size)
 
-    # verificamos si llegó el mensaje completo o si aún faltan partes del mensaje
-    # lo hacemos sin decodear, aun en bytes
-    is_end_of_message = contains_end_of_message(full_message.decode(), end_sequence)
+    # Modificar todo esto para que lo saque con find, buscamos el content lenght
+    print(first_message)
+    print(first_message.split(b"\r\n\r\n"))
+    head, body = first_message.split(b"\r\n\r\n")
+    
+    #para el head, separaremos cada línea
+    head_lines = head.split(b"\r\n")
+
+    # guardamos el contador de las cosas
+    C_length = 0
+
+    # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
+    for line in head_lines[1:]:
+        if (line.find(b"Content_Lenght")!=-1):
+            print(line)
+            key, value = line.split(b":")
+            C_length = value.decode()
+            break
 
     # entramos a un while para recibir el resto y seguimos esperando información
     # mientras el buffer no contenga secuencia de fin de mensaje
-    while not is_end_of_message:
+    while not (C_length == len(body)):
         # recibimos un nuevo trozo del mensaje
         recv_message = connection_socket.recv(buff_size)
 
         # lo añadimos al mensaje "completo"
-        full_message += recv_message
-
-        # verificamos si es la última parte del mensaje
-        # lo hacemos sin decodear, aun en bytes
-        is_end_of_message = contains_end_of_message(full_message.decode(), end_sequence)
-
-    print(full_message)
-    # parseamos el mensaje
-    full_message = proto.parse_HTTP_message(full_message)
-    print(full_message)
-    full_message = proto.create_HTTP_message(full_message)
-    print("CREATE HTTP: ", full_message)
-
-    # removemos la secuencia de fin de mensaje, esto entrega un mensaje en string
-    full_message = remove_end_of_message(full_message.decode(), end_sequence)
+        body += recv_message
 
     # finalmente retornamos el mensaje
+    return head+b"\r\n\r\n"+body
+
+def receive_mes(connection_socket, buff_size):
+    full_message=it_receive_full_message(connection_socket, buff_size)
+    full_message=proto.parse_HTTP_message(full_message)
+
     return full_message
-
-
-def contains_end_of_message(message, end_sequence):
-    return message.endswith(end_sequence)
-
-
-def remove_end_of_message(full_message, end_sequence):
-    index = full_message.rfind(end_sequence)
-    return full_message[:index]
 
 if __name__ == "__main__":
     # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
@@ -84,7 +77,9 @@ if __name__ == "__main__":
 
         # luego recibimos el mensaje usando la función que programamos
         # esta función entrega el mensaje en string (no en bytes) y sin el end_of_message
-        recv_message = receive_full_message(new_socket, buff_size, end_of_message)
+        recv_message = receive_mes(new_socket, buff_size)
+        
+        #recv_message = receive_full_message(new_socket, buff_size, end_of_message)
 
         print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
