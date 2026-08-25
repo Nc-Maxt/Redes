@@ -49,20 +49,20 @@ def create_HTTP_message(data: dict):
 
     #Luego agregamos los headers
     for key in data.keys():
-        http_message += f"{key}: {data[key]}\r\n"
+        http_message += f"{key.decode()}: {data[key].decode()}\r\n"
 
     # Agregamos el body
-    http_message += f"\r\n{body}"
+    http_message += f"\r\n{body.decode()}"
 
     # Retornamos el mensaje HTTP completo en bytes
     return http_message.encode()
 
-def st_l(data: dict, msg: str):
+def st_l(data: dict, msg: bytes):
     # Armamos la startline con los datos del diccionario.
     # Si el diccionario tiene 'código', es una response; si no, es una request.
     if "código" in data:
-        msg += f"{data.pop('versión')} {data.pop('código')} {data.pop('razón')}\r\n"
+        msg += f"{data.pop('versión').decode()} {data.pop('código').decode()} {data.pop('razón').decode()}\r\n"
     else:
-        msg += f"{data.pop('método')} {data.pop('ruta')} {data.pop('versión')}\r\n"
+        msg += f"{data.pop('método').decode()} {data.pop('ruta').decode()} {data.pop('versión').decode()}\r\n"
     return msg
         
