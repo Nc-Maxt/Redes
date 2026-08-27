@@ -2,6 +2,7 @@ import socket
 import protocolos as proto
 import json
 import sys
+import base64
 
 
 def it_receive_full_message(connection_socket, buff_size) -> bytes:
@@ -116,7 +117,23 @@ if __name__ == "__main__":
 
         html = open('assets/respuesta.html', 'r').read()
 
-        if resto in prohibidos:
+        if "assets/image.png" in resto:
+            with open("assets/image.png", "rb") as img:
+                image_data = img.read()
+
+            response_dict = {
+                b"version": b"HTTP/1.1",
+                b"response": b"200",
+                b"reason": b"OK",
+                b"Content-Type": b"image/png",
+                b"Content-Length": str(len(image_data)).encode(),
+                b"Connection": b"keep-alive",
+                b"Access-Control-Allow-Origin": b"*",
+                b"body": image_data,
+            }
+            response_message2 = proto.create_HTTP_message(response_dict)
+
+        elif resto in prohibidos:
             response_dict = {
                 b"version": b"HTTP/1.1",
                 b"response": b"403",
