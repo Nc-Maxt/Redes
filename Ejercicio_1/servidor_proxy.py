@@ -6,12 +6,19 @@ import sys
 
 def it_receive_full_message(connection_socket, buff_size) -> bytes:
 
-    # recibimos la primera parte del mensaje
-    first_message = connection_socket.recv(buff_size)
-    
+    head = b""
+    ciclos = 0 #contador de ciclos para leer respuestas
+
+
+    # iteramos hasta encontrar el body
+    while head.find(b"\r\n\r\n") == -1:
+        recv_message = connection_socket.recv(buff_size)
+        ciclos +=1
+        head += recv_message
+
     #separamos head del body por el doble salto de linea
-    head, body = first_message.split(b"\r\n\r\n")
-    
+    head, body = head.split(b"\r\n\r\n", 1)
+
     #para el head, separaremos cada línea
     head_lines = head.split(b"\r\n")
 
@@ -21,11 +28,8 @@ def it_receive_full_message(connection_socket, buff_size) -> bytes:
     # Luego encontraremos el header de Content-Length para saber si nos faltan bytes que leer
     for line in head_lines[1:]:
         if (line.find(b"Content-Length:")!=-1):
-            key, value = line.split(b":")
+            _, value = line.split(b":")
             C_length = value.decode()            
-
-    #contador de ciclos para leer respuestas
-    ciclos = 1 #caso first message
 
     # entramos a un while para recibir el resto y seguimos esperando información
     # mientras que el tamano del body no sea el largo declarado
@@ -57,7 +61,7 @@ if __name__ == "__main__":
     print(path_prohibidos)
     # definimos el tamaño del buffer de recepción y el socket donde estaremos escuchando
     # cuando el proxy actue como servidor
-    buff_size = 1024
+    buff_size = 50
     new_socket_address = ('localhost', 5003)
 
     print('Creando sockets - Socket server')
@@ -148,6 +152,10 @@ if __name__ == "__main__":
                     mess_body = recv_message2[b"body"]
                     new_body = mess_body.replace(key.encode(),pair[key].encode().strip())
                     recv_message2[b'body'] = new_body
+
+            # al censurar cambiamos el largo del body, asi que el Content-Length
+            # que venia del server ya no sirve y hay que recalcularlo
+            recv_message2[b"Content-Length"] = str(len(recv_message2[b"body"])).encode()
 
             response_message2 = proto.create_HTTP_message(recv_message2)
 
