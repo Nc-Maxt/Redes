@@ -58,11 +58,12 @@ def receive_mes(connection_socket, buff_size) -> dict:
 if __name__ == "__main__":
 
     path_prohibidos = sys.argv[1]
-    print(path_prohibidos)
+    IP_VM = sys.argv[2]
     # definimos el tamaño del buffer de recepción y el socket donde estaremos escuchando
     # cuando el proxy actue como servidor
     buff_size = 50
-    new_socket_address = ('172.20.10.3', 5003)
+    new_socket_address = ('172.20.10.3', 8000)
+    print(F"Proxy disponible en {IP_VM}:8000. \n")
 
     print('Creando sockets - Socket server')
     # armamos los sockets, uno es para el cliente y el otro para el servidor.
