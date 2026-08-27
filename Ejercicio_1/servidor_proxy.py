@@ -106,6 +106,7 @@ if __name__ == "__main__":
             # usamos json para manejar los datos
             data_json = json.load(file)
             prohibidos = data_json["blocked"]
+            censura = data_json["forbidden_words"]
             elquepregunta = data_json["user"]
 
         html = open('assets/respuesta.html', 'r').read()
@@ -131,6 +132,7 @@ if __name__ == "__main__":
             # armamos la response HTTP como diccionario, siguiendo el mismo formato que entrega parse_HTTP_message, y usamos create_HTTP_message para
             # convertirla a bytes (status line + headers + body)
             recv_message[b"X-ElQuePregunta"] = elquepregunta.encode() #anado header personalizado a la request que mando al server. 
+                        
             response_message = proto.create_HTTP_message(recv_message)
 
             print(f"MENSAJE QUE VAMOS A HACERLE ECHO: {response_message}")
@@ -138,6 +140,15 @@ if __name__ == "__main__":
             # create_HTTP_message ya retorna bytes, no hace falta volver a encode
             client_socket.send(response_message)
             recv_message2 = receive_mes(client_socket, buff_size)
+            
+
+            # ahora veremos si es que hay palabras prohibidas en el body
+            for pair in censura:
+                for key in pair:
+                    mess_body = recv_message2[b"body"]
+                    new_body = mess_body.replace(key.encode(),pair[key].encode().strip())
+                    recv_message2[b'body'] = new_body
+
             response_message2 = proto.create_HTTP_message(recv_message2)
 
             print(f"MENSAJE QUE recibimos DE VUELTA: {response_message2}")
