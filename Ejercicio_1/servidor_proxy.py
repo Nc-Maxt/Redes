@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # definimos el tamaño del buffer de recepción y el socket donde estaremos escuchando
     # cuando el proxy actue como servidor
     buff_size = 50
-    new_socket_address = ('172.20.10.3', 8000)
+    new_socket_address = (f'{IP_VM}', 8000)
     print(F"Proxy disponible en {IP_VM}:8000. \n")
 
     print('Creando sockets - Socket server')
