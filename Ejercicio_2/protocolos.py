@@ -1,24 +1,26 @@
+from dnslib.dns import RR, A
+from dnslib import DNSRecord
+from dnslib.dns import CLASS, QTYPE
+import dnslib
+
+
 # toma un mensaje en bytes y lo transforma en un dict de bytes
-def parse_HTTP_message(http_message: bytes) -> dict[bytes]:
-    # separamos header de body
-    head, body = http_message.split(b"\r\n\r\n", 1)
+def parse_DNS_message(dns_message: bytes) -> dict[hex]:
+    # como el mensaje esta en formato dns por la librería, podemos usar la librería para parsearlo 
+    # y obtener la información relevante Qname, ANCOUNT, NSCOUNT, ARCOUNT, la sección Answer, la sección Authority y la sección Additional
 
-    #para el head, separaremos cada línea
-    head_lines = head.split(b"\r\n")
-    # La estructura a usar será un diccionario
-    HTTP_dict = {}
-    # Primero trabajamos y agregamos la información de la startline
-    informacion(HTTP_dict, head_lines[0])
+    d = DNSRecord.parse(dns_message)
+    # armamos un diccionario con la información relevante   
+    info = {}
+    info["Qname"] = d.questions[0].get_qname()
+    info["ANCOUNT"] = d.header.a
+    info["NSCOUNT"] = d.header.auth
+    info["ARCOUNT"] = d.header.ar
+    info["Answer"] = d.rr
+    info["Authority"] = d.auth
+    info["Additional"] = d.ar
+    return info
 
-    # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
-    for line in head_lines[1:]:
-        key, value = line.split(b":", 1)
-        # se usa strip para eliminar espacios en blanco al inicio y al final
-        HTTP_dict[key.strip()] = value.strip()
-
-    # El body se agrega al diccioanrio
-    HTTP_dict[b"body"] = body
-    return HTTP_dict
 
 def informacion(head_dict: dict, start_line: bytes) -> None:
     # Separamos la start_line en sus 3 partes principales.

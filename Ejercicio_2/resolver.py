@@ -1,4 +1,5 @@
 import socket
+import protocolos as po
 
 print('Creando socket - resolver')
 
@@ -20,6 +21,5 @@ while True:
     # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
     print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
-
-    # respondemos indicando que recibimos el mensaje
-    response_message = recv_message
+    datos = po.parse_HTTP(recv_message)
+    print(f' -> Se ha parseado el mensaje en el siguiente diccionario: {datos}')
