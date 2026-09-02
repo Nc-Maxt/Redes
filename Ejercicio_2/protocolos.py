@@ -35,4 +35,15 @@ def resolver(mensaje_consulta: bytes, ip_addr=root_ip) -> bytes:
     resp, _ = client_socket.recvfrom(4096)
     print("recibí mensaje")
     datos = parse_DNS_message(resp)
-    return datos
+
+    tipo_resp, ip = trabajar(datos)
+
+    if tipo_resp == "A":
+        nuevo_msg = crear_mensaje(, "A")
+        return nuevo_msg
+    elif tipo_resp == "AAAA":
+        nuevo_msg = crear_mensaje(, "AAAA")
+        resolver(nuevo_msg, ip)
+    else:
+        nuevo_msg = crear_mensaje(, "AAAA")
+        resolver(nuevo_msg, ip)

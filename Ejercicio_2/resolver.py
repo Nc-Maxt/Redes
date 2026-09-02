@@ -24,3 +24,4 @@ while True:
 
     info = po.resolver(recv_message)
     print(info)
+    resolver_socket.sendto(info, client_address)
