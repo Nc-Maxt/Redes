@@ -1,7 +1,7 @@
 import socket
 
 # esta función se encarga de recibir el mensaje completo desde el cliente en caso de que el mensaje sea más grande
-#  que el tamaño del buffer 'buff_size', esta función va esperar a que # llegue el resto. Para saber si el 
+# que el tamaño del buffer 'buff_size', esta función va esperar a que # llegue el resto. Para saber si el 
 # mensaje ya llegó por completo, se busca el caracter de fin de mensaje (parte de nuestro protocolo inventado)
 # podría ser que recibimos el mensaje desordenado, en este caso no lo ordenamos por simplicidad
 # puede darse el caso de que el final del mensaje llegue antes que el resto de partes y finalizará (posteriormente se abordará solución)
