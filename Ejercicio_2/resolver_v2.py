@@ -1,5 +1,4 @@
 import socket
-import protocolos as po
 
 print('Creando socket - resolver')
 
@@ -22,5 +21,5 @@ while True:
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
     print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
-    info = po.resolver(recv_message)
-    print(info)
+    # respondemos indicando que recibimos el mensaje
+    response_message = recv_message

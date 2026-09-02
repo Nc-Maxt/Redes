@@ -21,6 +21,5 @@ while True:
     # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
     print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
-
-    info = po.resolver(recv_message)
-    print(info)
+    datos = po.parse_DNS_message(recv_message)
+    print(f' -> Se ha parseado el mensaje en el siguiente diccionario: {datos}')

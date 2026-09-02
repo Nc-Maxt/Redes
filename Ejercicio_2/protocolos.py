@@ -1,8 +1,6 @@
 from dnslib.dns import RR, A
 from dnslib import DNSRecord
-from dnslib.dns import CLASS, QTYPE
-import dnslib
-
+import socket
 
 # toma un mensaje en bytes y lo transforma en un dict de bytes
 def parse_DNS_message(dns_message: bytes) -> dict[hex]:
@@ -21,51 +19,18 @@ def parse_DNS_message(dns_message: bytes) -> dict[hex]:
     info["Additional"] = d.ar
     return info
 
-
-def informacion(head_dict: dict, start_line: bytes) -> None:
-    # Separamos la start_line en sus 3 partes principales.
-    # Si empieza con "HTTP/" es una response (version response reason),
-    # si no, es una request (method path version)
-    primero, segundo, tercero = start_line.split(b" ", 2)
-    if primero.decode().startswith("HTTP/"):
-        head_dict[b"version"] = primero.strip() #"HTTP/1.1"
-        head_dict[b"response"] = segundo.strip() # 200
-        head_dict[b"reason"] = tercero.strip() # "OK"
-    else:
-        head_dict[b"method"] = primero.strip() # "GET"
-        head_dict[b"path"] = segundo.strip() # "/"
-        head_dict[b"version"] = tercero.strip() # "HTTP/1.1"
-
-
-def create_HTTP_message(data: dict[bytes]) -> bytes:
-    # recibimos la estructura de datos enviada por parse_HTTP y lo convertimos en una cadena de texto con el formato HTTP
-
-    #Creamos el string que contendrá el mensaje HTTP completo
-    http_message = b""
-    # Primero agregamos la startline
-    http_message = st_l(data, http_message)
-    print(http_message)
-
-    # Luego sacamos el body del diccionario
-    body = data.pop(b'body')
-
-    #Luego agregamos los headers
-    for key in data.keys():
-        http_message += key + b": " + data[key]+ b"\r\n"
-
-    # Agregamos el body
-    http_message = http_message + b"\r\n" + body
-
-    # Retornamos el mensaje HTTP completo en bytes
-    return http_message
-
-def st_l(data: dict, msg: bytes) -> bytes:
-    # Armamos la startline con los datos del diccionario.
-    # Si el diccionario tiene 'código', es una response; si no, es una request.
-    if b"response" in data:
-        msg = msg + data.pop(b'version') + b" " + data.pop(b'response') + b" " + data.pop(b'reason') + b"\r\n"
-    else:
-        msg = msg + data.pop(b'method')+ b" " + data.pop(b'path') + b" " + data.pop(b'version') + b"\r\n"
-    return msg
-
-        
+root_ip = "198.41.0.4"
+def resolver(mensaje_consulta: bytes, ip_addr=root_ip) -> bytes:
+    #recordar que el mensaje de consulta es justamente el que recibo del cliente
+    # ahora yo debo ser quien envia ese mensaje al sv para preguntar
+    # para ello debo hacer otro socket para actuar como cliente
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # Como es un socket NO orientado a conexión no necesitamos conectarlo a una dirección específica
+    address = ('localhost', 5000)
+    print("voy a mandar un mensaje")
+    client_socket.sendto(mensaje_consulta, address)
+    print("esperando mensaje")
+    resp, _ = client_socket.recvfrom(4096)
+    print("recibí mensaje")
+    datos = parse_DNS_message(resp)
+    return datos
