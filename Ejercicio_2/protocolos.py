@@ -42,7 +42,7 @@ def parse_DNS_message(dns_message: bytes) -> dict[hex]:
 #root_ip = "127.0.0.53"
 root_ip = "198.41.0.4"
 
-def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = False) -> bytes:
+def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes:
 
     resp = send_DNS_query(mensaje_consulta, ip_addr)
 
@@ -52,26 +52,31 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = Fals
 
     nombre = "."
     n_ip = ip_addr
+    print("entrando al caso de answer")
     if datos["ANCOUNT"] > 0:
         for record in datos["Answer"]:
             if QTYPE.get(record.rtype) == "A":
                 if debug:
                     print("(debug) Consulta resuelta.")
                 return resp
+    print("entrando al caso de nameserver")
     if datos["NSCOUNT"]>0:
         for record in datos["Additional"]:
             if QTYPE.get(record.rtype) == "A":
-                n_ip = record.rdata
+                n_ip = str(record.rdata)
                 nombre = record.get_rname()
                 if debug:
                     print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
+                print(str(n_ip))
                 valor = resolver(mensaje_consulta, n_ip, debug)
                 if valor is not None:
-                    return valor                        
+                    return valor    
+        print("Buscando en opciones extra")                    
         for record in datos["Authority"]:
             if QTYPE.get(record.rtype) == "NS":
                 ns = record
-                buscar = ns.get_rdata()
+                buscar = ns.get_rname()
+                print(f"estoy buscando {buscar}")
                 q = DNSRecord.question(buscar)
                 question = q.encode()
                 info = resolver(question, debug=debug)
