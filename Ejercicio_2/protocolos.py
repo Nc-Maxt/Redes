@@ -77,9 +77,8 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
                 ns = record
                 buscar = ns.get_rname()
                 print(f"estoy buscando {buscar}")
-                q = DNSRecord.question(buscar)
-                question = q.encode()
-                info = resolver(question, debug=debug)
+                q = DNSRecord.question(str(buscar))
+                info = resolver(bytes(q.pack()), debug=debug)
                 if info is not None:
                     parseado = parse_DNS_message(info)
                     for record in parseado["Answer"]:
