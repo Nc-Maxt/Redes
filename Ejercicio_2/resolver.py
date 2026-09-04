@@ -23,5 +23,7 @@ while True:
     print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
     info = po.resolver(recv_message)
+    print("mensaje para enviar devuelta al cliente es")
     print(info)
     resolver_socket.sendto(info, client_address)
+    

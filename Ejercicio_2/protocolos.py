@@ -1,3 +1,6 @@
+
+import dnslib
+from dnslib.dns import CLASS, QTYPE
 from dnslib.dns import RR, A
 from dnslib import DNSRecord
 import socket
@@ -19,7 +22,8 @@ def parse_DNS_message(dns_message: bytes) -> dict[hex]:
     info["Additional"] = d.ar
     return info
 
-root_ip = "127.0.0.53"
+#root_ip = "127.0.0.53"
+root_ip = "198.41.0.4"
 
 def resolver(mensaje_consulta: bytes, ip_addr=root_ip) -> bytes:
     #recordar que el mensaje de consulta es justamente el que recibo del cliente
@@ -35,15 +39,60 @@ def resolver(mensaje_consulta: bytes, ip_addr=root_ip) -> bytes:
     resp, _ = client_socket.recvfrom(4096)
     print("recibí mensaje")
     datos = parse_DNS_message(resp)
+    print(datos)
 
-    tipo_resp, ip = trabajar(datos)
-
-    if tipo_resp == "A":
-        nuevo_msg = crear_mensaje(, "A")
-        return nuevo_msg
-    elif tipo_resp == "AAAA":
-        nuevo_msg = crear_mensaje(, "AAAA")
-        resolver(nuevo_msg, ip)
+    n_ip = ip_addr
+    found = 0
+    if datos["ANCOUNT"] > 0:
+        for record in datos["Answer"]:
+            if QTYPE.get(record.rtype) == "A":
+                return resp
     else:
-        nuevo_msg = crear_mensaje(, "AAAA")
-        resolver(nuevo_msg, ip)
+        if datos["NSCOUNT"]>0:
+            for record in datos["Additional"]:
+                if QTYPE.get(record.rtype) == "A":
+                    n_ip = record.rdata
+                    found = 1
+                    break
+                    #new_ip = obtener_ip(record)
+            if found:
+                return resolver(mensaje_consulta, n_ip)
+            else:
+                ns = "nada"
+                for record in datos["Authority"]:
+                    if QTYPE.get(record.rtype) == "NS":
+                        ns = record
+                buscar = ns.get_rname()
+                q = DNSRecord.question(buscar)
+                question = q.encode()
+                info = resolver(question)
+                parseado = parse_DNS_message(info)
+                for record in parseado["Answer"]:
+                    if QTYPE.get(record.rtype) == "A":
+                        dire_ip = record.rdata
+                return resolver(mensaje_consulta, dire_ip)
+        else:
+            pass
+        
+                
+                    
+
+
+
+    #    val = verificar_A(datos["Answer"])
+    #    return resp["Answer"][val]
+    #else:
+    #    if datos
+    #\**
+    #tipo_resp, ip = trabajar(datos)
+#
+    #if tipo_resp == "A":
+    #    nuevo_msg = crear_mensaje(, "A")
+    #    return nuevo_msg
+    #elif tipo_resp == "AAAA":
+    #    nuevo_msg = crear_mensaje(, "AAAA")
+    #    resolver(nuevo_msg, ip)
+    #else:
+    #    nuevo_msg = crear_mensaje(, "AAAA")
+    #    resolver(nuevo_msg, ip)
+    #    *\
