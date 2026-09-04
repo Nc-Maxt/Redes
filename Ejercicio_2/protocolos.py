@@ -67,8 +67,7 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = Fals
                     print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
                 valor = resolver(mensaje_consulta, n_ip, debug)
                 if valor is not None:
-                    return valor
-                        
+                    return valor                        
         for record in datos["Authority"]:
             if QTYPE.get(record.rtype) == "NS":
                 ns = record
@@ -76,16 +75,20 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = Fals
                 q = DNSRecord.question(buscar)
                 question = q.encode()
                 info = resolver(question, debug=debug)
-                parseado = parse_DNS_message(info)
-                for record in parseado["Answer"]:
-                    if QTYPE.get(record.rtype) == "A":
-                        n_ip = record.rdata
-                        nombre = record.get_rname()
-                        if debug:
-                            print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
-                        valor = resolver(mensaje_consulta, n_ip, debug)
-                        if valor is not None:
-                            return valor
+                if info is not None:
+                    parseado = parse_DNS_message(info)
+                    for record in parseado["Answer"]:
+                        if QTYPE.get(record.rtype) == "A":
+                            n_ip = record.rdata
+                            nombre = record.get_rname()
+                            if debug:
+                                print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
+                            valor = resolver(mensaje_consulta, n_ip, debug)
+                            if valor is not None:
+                                return valor
+        if debug:
+            print("(debug) No es uno de los casos a estudiar.")
+            return None
     else:
         if debug:
             print("(debug) No es uno de los casos a estudiar.")
