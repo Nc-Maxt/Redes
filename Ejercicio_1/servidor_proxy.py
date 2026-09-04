@@ -2,8 +2,6 @@ import socket
 import protocolos as proto
 import json
 import sys
-import base64
-
 
 def it_receive_full_message(connection_socket, buff_size) -> bytes:
 
