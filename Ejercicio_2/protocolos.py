@@ -11,6 +11,7 @@ def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> byt
     # para ello debo hacer otro socket para actuar como cliente
     # como es no orientado a conexion sera un efimero
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    client_socket.settimeout(2)
     # recuperamos el address a donde hay que mandar el mensaje
     address = (server_ip, 53)
     print("voy a mandar un mensaje")
@@ -75,7 +76,7 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
         for record in datos["Authority"]:
             if QTYPE.get(record.rtype) == "NS":
                 ns = record
-                buscar = ns.get_rname()
+                buscar = ns.rdata
                 print(f"estoy buscando {buscar}")
                 q = DNSRecord.question(str(buscar))
                 info = resolver(bytes(q.pack()), debug=debug)
@@ -87,7 +88,7 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
                             nombre = record.get_rname()
                             if debug:
                                 print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
-                            valor = resolver(mensaje_consulta, n_ip, debug)
+                            valor = resolver(mensaje_consulta, str(n_ip), debug)
                             if valor is not None:
                                 return valor
         if debug:
