@@ -25,5 +25,5 @@ while True:
     info = po.resolver(recv_message)
     print("mensaje para enviar devuelta al cliente es")
     print(info)
-    resolver_socket.sendto(info, client_address)
+    resolver_socket.sendto(info.encode(), client_address)
     
