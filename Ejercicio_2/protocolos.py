@@ -5,6 +5,44 @@ from dnslib.dns import RR, A
 from dnslib import DNSRecord
 import socket
 
+class Cache():
+    def __init__(self):
+        self.hist = []
+        self.presentes = {}
+        self.guardados = [None, None, None]
+
+    def act_top(self):
+        ord = sorted(self.presentes, key = lambda nm: self.presentes[nm], reverse= True)
+        self.guardados = ord[:3]
+
+        while len(self.guardados) < 3:
+            self.guardados.append(None)
+
+    def act_presentes(self, nombre, resta):
+        nm = str(nombre)
+        if nm not in self.presentes:
+            self.presentes[nm] = 1
+        else:
+            if resta:
+                self.presentes[nm] -= 1
+                if self.act_presentes[nm] == 0:
+                    del self.presentes[nm]
+            else:
+                self.presentes[nm] -= 1
+    
+    def actualizar_20(self, consulta):   
+        nm = str(consulta[0])
+        ip = str(consulta[1])
+        if len(self.hist)==20:
+            ant = self.hist.pop(0)
+            nm_ant = ant[0]
+            self.act_presentes(nm_ant, True)
+
+        self.hist = self.hist.append([nm, ip])
+        self.act_top()
+
+        
+
 def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> bytes:
     #recordar que el mensaje de consulta es justamente el que recibo del cliente
     # ahora yo debo ser quien envia ese mensaje al sv para preguntar
@@ -59,6 +97,8 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
             if QTYPE.get(record.rtype) == "A":
                 if debug:
                     print("(debug) Consulta resuelta.")
+                ##aqui se debe obtener la info y pasarlo a consulta para
+                ## actualizar los datos
                 return resp
     print("entrando al caso de nameserver")
     if datos["NSCOUNT"]>0:
