@@ -12,8 +12,9 @@ class Cache():
         self.guardados = [None, None, None]
 
     def act_top(self):
-        ord = sorted(self.presentes, key = lambda nm: self.presentes[nm], reverse= True)
-        self.guardados = ord[:3]
+        ordenado = sorted(self.presentes,
+                    key = lambda nm: self.presentes[nm], reverse= True)
+        self.guardados = ordenado[:3]
 
         while len(self.guardados) < 3:
             self.guardados.append(None)
@@ -25,22 +26,30 @@ class Cache():
         else:
             if resta:
                 self.presentes[nm] -= 1
-                if self.act_presentes[nm] == 0:
+                if self.presentes[nm] == 0:
                     del self.presentes[nm]
             else:
-                self.presentes[nm] -= 1
+                self.presentes[nm] += 1
     
     def actualizar_20(self, consulta):   
-        nm = str(consulta[0])
-        ip = str(consulta[1])
+        nm = consulta[0]
+        ip = consulta[1]
         if len(self.hist)==20:
             ant = self.hist.pop(0)
             nm_ant = ant[0]
             self.act_presentes(nm_ant, True)
 
-        self.hist = self.hist.append([nm, ip])
+        self.hist.append([nm, ip])
+        self.act_presentes(nm, False)
         self.act_top()
 
+    def recuperar_ip(self, nombre):
+        nm = str(nombre)
+        if nm in self.guardados:
+            for consulta in self.hist:
+                if consulta[0] == nm:
+                    return consulta[1]
+        return None
         
 
 def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> bytes:
@@ -51,7 +60,7 @@ def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> byt
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client_socket.settimeout(2)
     # recuperamos el address a donde hay que mandar el mensaje
-    address = (server_ip, 53)
+    address = (server_ip, server_port)
     print("voy a mandar un mensaje")
     client_socket.sendto(mensaje, address)
     print("esperando mensaje")
@@ -59,6 +68,21 @@ def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> byt
     print("recibí mensaje")
     client_socket.close()
     return resp
+
+
+def retrieve_info(datos: dict[hex]) -> tuple[str| None, str| None]:
+    # esta función toma un dict de bytes y devuelve el Qname y la dirección IP
+    # si no hay dirección IP devuelve None
+    qname = str(datos["Qname"])
+    ip = None
+    if datos["ANCOUNT"] > 0:
+        for record in datos["Answer"]:
+            if QTYPE.get(record.rtype) == "A":
+                if str(record.get_rname()) == qname:
+                    ip = str(record.rdata)
+                    return (qname, ip)
+    return (None, None)
+
 
 # toma un mensaje en bytes y lo transforma en un dict de bytes
 def parse_DNS_message(dns_message: bytes) -> dict[hex]:
@@ -76,65 +100,3 @@ def parse_DNS_message(dns_message: bytes) -> dict[hex]:
     info["Authority"] = d.auth
     info["Additional"] = d.ar
     return info
-
-
-#root_ip = "127.0.0.53"
-root_ip = "198.41.0.4"
-
-def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes:
-
-    resp = send_DNS_query(mensaje_consulta, ip_addr)
-
-    datos = parse_DNS_message(resp)
-    buscado = datos["Qname"]
-    print(datos)
-
-    nombre = "."
-    n_ip = ip_addr
-    print("entrando al caso de answer")
-    if datos["ANCOUNT"] > 0:
-        for record in datos["Answer"]:
-            if QTYPE.get(record.rtype) == "A":
-                if debug:
-                    print("(debug) Consulta resuelta.")
-                ##aqui se debe obtener la info y pasarlo a consulta para
-                ## actualizar los datos
-                return resp
-    print("entrando al caso de nameserver")
-    if datos["NSCOUNT"]>0:
-        for record in datos["Additional"]:
-            if QTYPE.get(record.rtype) == "A":
-                n_ip = str(record.rdata)
-                nombre = record.get_rname()
-                if debug:
-                    print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
-                print(str(n_ip))
-                valor = resolver(mensaje_consulta, n_ip, debug)
-                if valor is not None:
-                    return valor    
-        print("Buscando en opciones extra")                    
-        for record in datos["Authority"]:
-            if QTYPE.get(record.rtype) == "NS":
-                ns = record
-                buscar = ns.rdata
-                print(f"estoy buscando {buscar}")
-                q = DNSRecord.question(str(buscar))
-                info = resolver(bytes(q.pack()), debug=debug)
-                if info is not None:
-                    parseado = parse_DNS_message(info)
-                    for record in parseado["Answer"]:
-                        if QTYPE.get(record.rtype) == "A":
-                            n_ip = record.rdata
-                            nombre = record.get_rname()
-                            if debug:
-                                print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
-                            valor = resolver(mensaje_consulta, str(n_ip), debug)
-                            if valor is not None:
-                                return valor
-        if debug:
-            print("(debug) No es uno de los casos a estudiar.")
-            return None
-    else:
-        if debug:
-            print("(debug) No es uno de los casos a estudiar.")
-        return None
