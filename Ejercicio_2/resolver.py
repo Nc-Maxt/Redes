@@ -21,6 +21,8 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
         dns_q = q.pack()
         return dns_q
 
+    if debug and ip_addr == root_ip:
+        print(f"(debug) Consultando '{nombre}' a '.' con dirección IP '{ip_addr}'")
     resp = send_DNS_query(mensaje_consulta, ip_addr)
 
     datos = parse_DNS_message(resp)
