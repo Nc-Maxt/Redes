@@ -8,7 +8,7 @@ def parse_HTTP_message(http_message: bytes) -> dict[bytes]:
     # La estructura a usar será un diccionario
     HTTP_dict = {}
     # Primero trabajamos y agregamos la información de la startline
-    informacion(HTTP_dict, head_lines[0])
+    _informacion(HTTP_dict, head_lines[0])
 
     # Luego con cada línea se hace una llave y un valor, separando la clave del valor por el primer ":"
     for line in head_lines[1:]:
@@ -20,7 +20,7 @@ def parse_HTTP_message(http_message: bytes) -> dict[bytes]:
     HTTP_dict[b"body"] = body
     return HTTP_dict
 
-def informacion(head_dict: dict, start_line: bytes) -> None:
+def _informacion(head_dict: dict, start_line: bytes) -> None:
     # Separamos la start_line en sus 3 partes principales.
     # Si empieza con "HTTP/" es una response (version response reason),
     # si no, es una request (method path version)
@@ -41,7 +41,7 @@ def create_HTTP_message(data: dict[bytes]) -> bytes:
     #Creamos el string que contendrá el mensaje HTTP completo
     http_message = b""
     # Primero agregamos la startline
-    http_message = st_l(data, http_message)
+    http_message = _st_l(data, http_message)
     print(http_message)
 
     # Luego sacamos el body del diccionario
@@ -57,7 +57,7 @@ def create_HTTP_message(data: dict[bytes]) -> bytes:
     # Retornamos el mensaje HTTP completo en bytes
     return http_message
 
-def st_l(data: dict, msg: bytes) -> bytes:
+def _st_l(data: dict, msg: bytes) -> bytes:
     # Armamos la startline con los datos del diccionario.
     # Si el diccionario tiene 'código', es una response; si no, es una request.
     if b"response" in data:
