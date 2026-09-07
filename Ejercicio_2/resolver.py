@@ -8,6 +8,9 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
 
     #tengo el mensaje, lo reviso en cache
     nombre = DNSRecord.parse(mensaje_consulta).questions[0].get_qname()
+    if debug:
+        pass
+        #print(f"(debug) Buscando la ip de {nombre}")
     ip_answer = cache.recuperar_ip(nombre)
     if ip_answer is not None:
         if(debug):
@@ -21,7 +24,7 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
 
     datos = parse_DNS_message(resp)
     buscado = datos["Qname"]
-    # print(datos)
+    #print(datos)
 
     nombre = "."
     n_ip = ip_addr
@@ -51,7 +54,8 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
             if QTYPE.get(record.rtype) == "NS":
                 ns = record
                 buscar = ns.rdata
-                # print(f"estoy buscando {buscar}")
+                if debug:
+                    print(f"(Debug) Consultando por la ip de  {buscar}")
                 q = DNSRecord.question(str(buscar))
                 info = resolver(bytes(q.pack()), debug=debug)
                 if info is not None:
@@ -95,10 +99,14 @@ while True:
     #print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
     info = resolver(recv_message)
+    #print(parse_DNS_message(info))
     puntuales = retrieve_info(parse_DNS_message(info))
+    #print(f"guardando en cache {puntuales}")
     if puntuales[0] is not None:
+        
         cache.actualizar_20(puntuales)
-    #print("mensaje para enviar devuelta al cliente es")
-    #print(info)
-    resolver_socket.sendto(info, client_address)
+    if info is not None:
+        #print("mensaje para enviar devuelta al cliente es")
+        #print(info)
+        resolver_socket.sendto(info, client_address)
     

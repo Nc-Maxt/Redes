@@ -67,7 +67,7 @@ def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> byt
     return resp
 
 
-def retrieve_info(datos: dict[hex]) -> tuple[str| None, str| None]:
+def retrieve_info(datos: dict) -> tuple[str| None, str| None]:
     # esta función toma un dict de bytes y devuelve el Qname y la dirección IP
     # si no hay dirección IP devuelve None
     qname = str(datos["Qname"])
@@ -78,6 +78,13 @@ def retrieve_info(datos: dict[hex]) -> tuple[str| None, str| None]:
                 if str(record.get_rname()) == qname:
                     ip = str(record.rdata)
                     return (qname, ip)
+            if QTYPE.get(record.rtype) == "CNAME":
+                cname = str(record.rdata)
+                for rec in datos["Answer"]:
+                    if QTYPE.get(rec.rtype) == "A":
+                        if str(rec.get_rname()) == cname:
+                            ip = str(rec.rdata)
+                            return (qname, ip)
     return (None, None)
 
 
