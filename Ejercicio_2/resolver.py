@@ -21,18 +21,20 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
 
     datos = parse_DNS_message(resp)
     buscado = datos["Qname"]
-    print(datos)
+    # print(datos)
 
     nombre = "."
     n_ip = ip_addr
-    print("entrando al caso de answer")
+    if debug:
+        print("(debug) Entrando al caso de answer")
     if datos["ANCOUNT"] > 0:
         for record in datos["Answer"]:
             if QTYPE.get(record.rtype) == "A":
                 if debug:
                     print("(debug) Consulta resuelta.")
                 return resp
-    print("entrando al caso de nameserver")
+    if debug:
+        print("(debug) Entrando al caso de nameserver")
     if datos["NSCOUNT"]>0:
         for record in datos["Additional"]:
             if QTYPE.get(record.rtype) == "A":
@@ -40,16 +42,16 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
                 nombre = record.get_rname()
                 if debug:
                     print(f"(debug) Consultando '{buscado}' a '{nombre}' con dirección IP '{n_ip}'")
-                print(str(n_ip))
                 valor = resolver(mensaje_consulta, n_ip, debug)
                 if valor is not None:
                     return valor    
-        print("Buscando en opciones extra")                    
+        if debug:
+            print("(debug) Buscando en opciones extra")                    
         for record in datos["Authority"]:
             if QTYPE.get(record.rtype) == "NS":
                 ns = record
                 buscar = ns.rdata
-                print(f"estoy buscando {buscar}")
+                # print(f"estoy buscando {buscar}")
                 q = DNSRecord.question(str(buscar))
                 info = resolver(bytes(q.pack()), debug=debug)
                 if info is not None:
@@ -90,13 +92,13 @@ while True:
     # En vez de aceptar una conexión, recibimos un mensaje desde el socket
     # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
-    print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
+    #print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
     info = resolver(recv_message)
     puntuales = retrieve_info(parse_DNS_message(info))
     if puntuales[0] is not None:
         cache.actualizar_20(puntuales)
-    print("mensaje para enviar devuelta al cliente es")
-    print(info)
+    #print("mensaje para enviar devuelta al cliente es")
+    #print(info)
     resolver_socket.sendto(info, client_address)
     

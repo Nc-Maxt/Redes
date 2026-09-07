@@ -61,11 +61,8 @@ def send_DNS_query(mensaje: bytes, server_ip: str, server_port: int = 53) -> byt
     client_socket.settimeout(2)
     # recuperamos el address a donde hay que mandar el mensaje
     address = (server_ip, server_port)
-    print("voy a mandar un mensaje")
     client_socket.sendto(mensaje, address)
-    print("esperando mensaje")
     resp, _ = client_socket.recvfrom(4096)
-    print("recibí mensaje")
     client_socket.close()
     return resp
 
