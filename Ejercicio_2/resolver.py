@@ -5,7 +5,7 @@ from protocolos import *
 root_ip = "198.41.0.4"
 cache = Cache()
 
-def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes:
+def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes | None:
 
     #tengo el mensaje, lo reviso en cache
     nombre = DNSRecord.parse(mensaje_consulta).questions[0].get_qname()
