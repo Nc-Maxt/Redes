@@ -96,7 +96,7 @@ while True:
     # En vez de aceptar una conexión, recibimos un mensaje desde el socket
     # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
-    #print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
+    print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
     info = resolver(recv_message)
     #print(parse_DNS_message(info))
