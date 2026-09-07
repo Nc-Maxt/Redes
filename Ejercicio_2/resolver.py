@@ -83,7 +83,7 @@ if len(args) != 2:
     print("Uso: python resolver.py <IP_VM>")
     sys.exit(1)
 
-IP_VM = int(args[1])
+IP_VM = args[1]
 
 print('Creando socket - resolver')
 
