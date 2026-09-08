@@ -6,7 +6,26 @@ root_ip = "198.41.0.4"
 cache = Cache()
 
 def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes | None:
+    """Resuelve una consulta DNS de forma iterativa desde un servidor raíz.
 
+    Primero busca el nombre en la cache; si está, arma la respuesta con la IP
+    guardada. Si no, envía la consulta a ip_addr y, según la respuesta:
+      - si hay un registro A en Answer, retorna la respuesta tal cual;
+      - si hay nameservers con IP en Additional, se llama recursivamente a
+        cada uno;
+      - si solo hay registros NS en Authority, primero resuelve la IP de ese
+        nameserver y luego repite la consulta original contra esa IP.
+
+    Args:
+        mensaje_consulta: Consulta DNS en bytes tal como la envió el cliente.
+        ip_addr: IP del servidor DNS al que se envía la consulta. Por defecto
+            el servidor raíz.
+        debug: Si es True imprime el avance de la resolución por consola.
+
+    Returns:
+        Respuesta DNS en bytes con la resolución, o None si no se pudo
+        resolver.
+    """
     #tengo el mensaje, lo reviso en cache
     nombre = DNSRecord.parse(mensaje_consulta).questions[0].get_qname()
     if debug:
