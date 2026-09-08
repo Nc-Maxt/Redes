@@ -1,10 +1,11 @@
 import socket
+import sys
 from protocolos import *
 
 root_ip = "198.41.0.4"
 cache = Cache()
 
-def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes:
+def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True) -> bytes | None:
 
     #tengo el mensaje, lo reviso en cache
     nombre = DNSRecord.parse(mensaje_consulta).questions[0].get_qname()
@@ -20,6 +21,8 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
         dns_q = q.pack()
         return dns_q
 
+    if debug and ip_addr == root_ip:
+        print(f"(debug) Consultando '{nombre}' a '.' con dirección IP '{ip_addr}'")
     resp = send_DNS_query(mensaje_consulta, ip_addr)
 
     datos = parse_DNS_message(resp)
@@ -77,6 +80,13 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
             print("(debug) No es uno de los casos a estudiar.")
         return None
 
+args = sys.argv
+if len(args) != 2:
+    print("Uso: python resolver.py <IP_VM>")
+    sys.exit(1)
+
+IP_VM = args[1]
+
 print('Creando socket - resolver')
 
 # armamos el socket, los parámetros que recibe el socket indican el tipo de conexión
@@ -84,7 +94,7 @@ print('Creando socket - resolver')
 resolver_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Como buscamos ver mensajes DNS necesitamos un socket NO orientado a conexión 
-address = ('localhost', 8000)
+address = (IP_VM, 8000)
 
 # ESTO ABRE EL SOCKET PARA QUE PUEDA RECIBIR DATOS EN LA DIRECCION Y PUERTO INDICADOS
 resolver_socket.bind(address)
@@ -96,7 +106,7 @@ while True:
     # En vez de aceptar una conexión, recibimos un mensaje desde el socket
     # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
     recv_message, client_address = resolver_socket.recvfrom(buffer_size)
-    #print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
+    print(f' -> Se ha recibido el siguiente mensaje: {recv_message}')
 
     info = resolver(recv_message)
     #print(parse_DNS_message(info))

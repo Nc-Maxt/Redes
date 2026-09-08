@@ -43,7 +43,7 @@ class Cache():
         self.act_presentes(nm, False)
         self.act_top()
 
-    def recuperar_ip(self, nombre):
+    def recuperar_ip(self, nombre) -> str | None:
         nm = str(nombre)
         if nm in self.guardados:
             for consulta in self.hist:
@@ -89,7 +89,7 @@ def retrieve_info(datos: dict) -> tuple[str| None, str| None]:
 
 
 # toma un mensaje en bytes y lo transforma en un dict de bytes
-def parse_DNS_message(dns_message: bytes) -> dict[hex]:
+def parse_DNS_message(dns_message: bytes) -> dict:
     # como el mensaje esta en formato dns por la librería, podemos usar la librería para parsearlo 
     # y obtener la información relevante Qname, ANCOUNT, NSCOUNT, ARCOUNT, la sección Answer, la sección Authority y la sección Additional
 
