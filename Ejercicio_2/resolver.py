@@ -93,7 +93,7 @@ def resolver(mensaje_consulta: bytes, ip_addr: str = root_ip, debug: bool = True
                                 return valor
         if debug:
             print("(debug) No es uno de los casos a estudiar.")
-            return None
+        return None
     else:
         if debug:
             print("(debug) No es uno de los casos a estudiar.")
@@ -132,7 +132,6 @@ while True:
     puntuales = retrieve_info(parse_DNS_message(info))
     #print(f"guardando en cache {puntuales}")
     if puntuales[0] is not None:
-        
         cache.actualizar_20(puntuales)
     if info is not None:
         #print("mensaje para enviar devuelta al cliente es")

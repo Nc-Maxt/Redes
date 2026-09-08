@@ -138,7 +138,7 @@ def retrieve_info(datos: dict) -> tuple[str| None, str| None]:
     """Extrae el nombre consultado y su IP desde un mensaje DNS parseado.
 
     Recorre la sección Answer buscando un registro A cuyo nombre coincida con
-    el Qname. Si en vez de eso hay un CNAME, busca el registro A que
+    el Qname. Si en vez de eso hay un CNAME, busca algún registro A que
     corresponde al alias.
 
     Args:
