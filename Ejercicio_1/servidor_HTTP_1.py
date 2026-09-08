@@ -3,7 +3,18 @@ import protocolos as proto
 import json
 
 def it_receive_full_message(connection_socket, buff_size):
+    """Recibe de forma iterativa un mensaje HTTP completo desde un socket.
 
+    Lee un primer trozo, separa head de body, busca el header Content-Length
+    y sigue leyendo del socket hasta que el body alcance ese largo.
+
+    Args:
+        connection_socket: Socket TCP ya conectado desde el que se lee.
+        buff_size: Cantidad máxima de bytes a leer en cada recv.
+
+    Returns:
+        Mensaje HTTP completo (head + body) en bytes.
+    """
     # recibimos la primera parte del mensaje
     first_message = connection_socket.recv(buff_size)
 
@@ -39,6 +50,18 @@ def it_receive_full_message(connection_socket, buff_size):
     return head+b"\r\n\r\n"+body
 
 def receive_mes(connection_socket, buff_size):
+    """Recibe un mensaje HTTP completo y lo retorna parseado como diccionario.
+
+    Envuelve it_receive_full_message y aplica proto.parse_HTTP_message al
+    resultado.
+
+    Args:
+        connection_socket: Socket TCP ya conectado desde el que se lee.
+        buff_size: Cantidad máxima de bytes a leer en cada recv.
+
+    Returns:
+        Diccionario con llaves y valores en bytes.
+    """
     full_message=it_receive_full_message(connection_socket, buff_size)
     full_message=proto.parse_HTTP_message(full_message)
 

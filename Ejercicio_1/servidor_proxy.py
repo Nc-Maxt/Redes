@@ -4,7 +4,19 @@ import json
 import sys
 
 def it_receive_full_message(connection_socket, buff_size) -> bytes:
+    """Recibe de forma iterativa un mensaje HTTP completo desde un socket.
 
+    Lee trozos hasta encontrar el fin del head ("\\r\\n\\r\\n"), busca el header
+    Content-Length y continúa leyendo hasta que el body tenga exactamente ese
+    largo. Imprime la cantidad de ciclos de recv que fueron necesarios.
+
+    Args:
+        connection_socket: Socket TCP ya conectado desde el que se lee.
+        buff_size: Cantidad máxima de bytes a leer en cada recv.
+
+    Returns:
+        Mensaje HTTP completo (head + body) en bytes.
+    """
     head = b""
     ciclos = 0 #contador de ciclos para leer respuestas
 
@@ -46,8 +58,20 @@ def it_receive_full_message(connection_socket, buff_size) -> bytes:
     print(f"Se necesitaron {ciclos} ciclos.")
     return full
 
-# empaquetamos el receive message iterativo para parsear el mensaje HTTP y devolver un diccionario
 def receive_mes(connection_socket, buff_size) -> dict:
+    """Recibe un mensaje HTTP completo y lo retorna parseado como diccionario.
+
+    Envuelve it_receive_full_message y aplica proto.parse_HTTP_message al
+    resultado. Se usa tanto para la request del cliente como para la response
+    del servidor remoto.
+
+    Args:
+        connection_socket: Socket TCP ya conectado desde el que se lee.
+        buff_size: Cantidad máxima de bytes a leer en cada recv.
+
+    Returns:
+        Diccionario con llaves y valores en bytes.
+    """
     full_message=it_receive_full_message(connection_socket, buff_size)
     full_message=proto.parse_HTTP_message(full_message)
 
