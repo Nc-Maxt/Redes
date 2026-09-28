@@ -1,0 +1,7 @@
+Este es un texto de ejemplo, generado para ser utilizado en el ejercicio 3. 
+Contiene varias líneas de texto que serán enviadas desde el cliente
+hacia el servidor en trozos de a lo más 16 bytes. 
+
+Posteriormente, el servidor debe imprimir el contenido de este archivo mediante la salida estándar.
+Dado que este es para la primera parte y se debiera comunicar solo entre el localhost no debiera haber 
+pérdida de información.
