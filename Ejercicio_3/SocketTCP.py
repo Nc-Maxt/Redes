@@ -137,3 +137,58 @@ class SocketTCP:
                 # si todo es correcto, retornamos el nuevo socket y la dirección final
                 print(f"Todo ok, avisamos del nuevo puerto para comunicar {nuevo_socket.address}")
                 return nuevo_socket, nuevo_socket.address
+
+    def send(self, message):
+
+        puntero = -1
+        fin = len(message)
+        # Enviamos el mensaje en trozos de a lo más n=16 bytes
+        while puntero < fin:
+            chunck = b""
+            if puntero != -1:
+                # se define el tamaño de los trozos a enviar
+                chunck_s = 16
+                # se obtiene el trozo a enviar
+                if puntero + chunck_s > len(message):
+                    chunck = message[puntero:]
+                else:
+                    chunck = message[puntero:puntero + chunck_s]
+            
+            # se parsea como mensaje con headers
+            pack = {
+                        b"m_type": (b"DATA" if puntero != -1 else b"INFO"),
+                        b"m_len": str(len(chunck)).encode(),
+                        b"m_seq": str(self.sequence).encode(),
+                        b"m_fin": (str(fin).encode() if puntero == -1 else b"-1"),
+                        b"body": chunck
+                    }
+            new_seq = int(self.sequence) + len(chunck)
+            red = self.create_segment(pack)
+            while True:
+                try:
+                    # intentamos enviar el mensaje al servidor, si no se recibe respuesta en el tiempo definido, se lanza una excepción de timeout
+                    self.socket_UDP.settimeout(self.timeout)
+                    self.socket_UDP.sendto(red, self.connection)
+
+                    mensaje, server_address = self.socket_UDP.recvfrom(1024)
+
+                    # si se recibe una respuesta, la procesamos
+                    r_dict = self.parse_segment(mensaje)
+                    r_seq = int(r_dict[b"m_seq"].decode())
+                    if (r_dict[b"m_type"] == b"ACK") and (r_seq == new_seq) and (server_address == self.connection):
+                        print(f"Mensaje enviado correctamente al servidor {self.connection}")
+                        self.sequence = new_seq
+                        # actualizo el puntero para el siguiente mensaje a enviar
+                        if puntero == -1:
+                            puntero = 0
+                        else:
+                            puntero += chunck_s
+                        break
+                    # en caso de que no llegue la respuesta esperada, se triggerea el timeout y se vuelve a enviar el mensaje
+                except socket.timeout:
+                    # el timeout 
+                    print(f"Timeout al enviar el mensaje al servidor {self.connection}")
+                    print(f"Reintentando enviar el mensaje al servidor {self.connection}")
+                    pass             
+               
+            
