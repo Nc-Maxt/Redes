@@ -61,6 +61,7 @@ class SocketTCP:
     def connect(self, address):
         # generamos un número aleatorio para la secuencia inicial
         n = random.randint(0, 100)
+        print(n)
         # creamos el diccionario para luego crear el segmento SYN y enviarlo al servidor
         ini_dict = {
             b"m_type": b"SYN",
@@ -69,14 +70,16 @@ class SocketTCP:
             b"body": b""
         }
         segment = self.create_segment(ini_dict)
+        print(f"intentando conectar con {address}")
         self.socket_UDP.sendto(segment, address)
 
         # esperamos a que llegue el SYN+ACK del servidor
+        print(f"Esperando mensaje devuelta de {address}")
         segment, info_add = self.socket_UDP.recvfrom(1024)
         tcp_dict = self.parse_segment(segment)
         # verificamos que la secuencia recibida sea la correcta y que la ip sea la misma a la que le enviamos el SYN
         # el puerto debería ser distinto, ya que el servidor nos asigna un puerto aleatorio para la conexión 
-        if (tcp_dict[b"m_type"] == b"SYN+ACK") and (int(tcp_dict[b"m_seq"].decode()) == n + 1) and (address[0] == info_add[0]):
+        if (tcp_dict[b"m_type"] == b"SYN+ACK") and (int(tcp_dict[b"m_seq"].decode()) == n + 1):
             # obtenemos la secuencia del servidor y le sumamos 1 para enviar el ACK
             seq = int(tcp_dict[b"m_seq"].decode()) + 1
             self.sequence = seq
@@ -87,6 +90,7 @@ class SocketTCP:
                 b"body": b""
             }
             segment = self.create_segment(ack_dict)
+            print(f"Mandamos mensaje devuelta a {info_add}")
             self.socket_UDP.sendto(segment, info_add)
             # guardamos la dirección del servidor para luego enviarle los mensajes
             self.set_connection(info_add)
@@ -94,6 +98,7 @@ class SocketTCP:
 
     def accept(self):
         # esperamos a que llegue un segmento SYN del cliente
+        print(f"Esperando mensaje de clientes")
         segment, client_address = self.socket_UDP.recvfrom(1024)
         # parseamos el segmento recibido
         tcp_dict = self.parse_segment(segment)
@@ -107,6 +112,7 @@ class SocketTCP:
             nuevo_socket.set_connection(client_address)
             nuevo_socket.set_sequence(seq)
             puerto = random.randint(1000, 9999)
+            print(f"Se bindea el nuevo puerto {(self.address[0], puerto)}")
             nuevo_socket.bind((self.address[0], puerto))
 
             # creamos el diccionario para luego crear el segmento SYN+ACK y enviarlo al cliente
@@ -116,13 +122,18 @@ class SocketTCP:
                 b"m_seq": str(seq).encode(),
                 b"body": b""
             }
+            print(ini_dict)
             segment = nuevo_socket.create_segment(ini_dict)
+            print(f"Le respondemos desde el sv a {client_address}")
             nuevo_socket.socket_UDP.sendto(segment, client_address)
 
             # esperamos a que llegue el ACK del cliente
+            print(f"Esperamos respuesta de {client_address}")
             segment, client_address = nuevo_socket.socket_UDP.recvfrom(1024)
             tcp_dict = nuevo_socket.parse_segment(segment)
             # verificamos que el segmento también corresponda al siguiente
+            print(tcp_dict)
             if (tcp_dict[b"m_type"] == b"ACK") and (int(tcp_dict[b"m_seq"].decode()) == seq + 1):
                 # si todo es correcto, retornamos el nuevo socket y la dirección final
+                print(f"Todo ok, avisamos del nuevo puerto para comunicar {nuevo_socket.address}")
                 return nuevo_socket, nuevo_socket.address
