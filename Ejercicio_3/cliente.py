@@ -7,10 +7,12 @@ print('Creando socket - Cliente')
 
 # armamos el socket, los parámetros que recibe el socket indican el tipo de conexión
 # socket.SOCK_DGRAM = socket NO orientado a conexión
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_socketTCP = SocketTCP()
 
-# Como es un socket NO orientado a conexión no necesitamos conectarlo a una dirección específica
+# Como queremos hacer un socket TCP debemos hacer el 3 way handshake
 address = ('localhost', 5000)
+client_socketTCP.connect(address)
+n_address = client_socketTCP.connection
 
 message = input("Escribir la dirección del archivo a enviar: ")
 print(f"Escribiste: {message}")
@@ -45,9 +47,9 @@ while puntero < len(send_message):
                 b"m_seq": str(1).encode(),
                 b"body": chunck
             }
-    ns = SocketTCP()
-    red = ns.create_segment(pack)
-    client_socket.sendto(red, address)
+    
+    red = client_socketTCP.create_segment(pack)
+    client_socketTCP.socket_UDP.sendto(red, n_address)
 
     #actualizo el puntero para el siguiente trozo
     puntero += chunck_s
