@@ -42,8 +42,8 @@ while puntero < len(send_message):
 
     # se parsea como mensaje con headers
     pack = {
-                b"m_type": b"",
-                b"m_len": str(chunck_s).encode(),
+                b"m_type": b"DATA",
+                b"m_len": str(len(chunck)).encode(),
                 b"m_seq": str(1).encode(),
                 b"body": chunck
             }
