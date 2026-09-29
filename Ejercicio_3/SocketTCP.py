@@ -1,6 +1,7 @@
 # archivo donde se creará la clase SpcketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
 import socket
+import numpy as np
 
 class SocketTCP:
     def __init__(self):
@@ -10,6 +11,11 @@ class SocketTCP:
         self.sequence = None
         self.options = [b"ACK", b"SYN", b"ACK+SYN", b"FIN", b"ACK+FIN", b"DATA", b"INFO"]
         self.timeout = 5
+
+        self.tot = None
+        self.all_msg = b""
+        self.msg_count = None
+        self.act_count = None
 
     def set_connection(self, connection):
         self.connection = connection
@@ -140,6 +146,8 @@ class SocketTCP:
             if (tcp_dict[b"m_type"] == b"ACK") and (int(tcp_dict[b"m_seq"].decode()) == seq + 1):
                 # si todo es correcto, retornamos el nuevo socket y la dirección final
                 print(f"Todo ok, avisamos del nuevo puerto para comunicar {nuevo_socket.address}")
+                # fijamos el contador para mensaje en 0, cosa de que al llamar recv se sepa que es el inicio del mensaje
+                nuevo_socket.msg_count = 0
                 return nuevo_socket, nuevo_socket.address
 
     def send(self, message):
@@ -197,5 +205,57 @@ class SocketTCP:
                     print(f"Timeout al enviar el mensaje al servidor {self.connection}")
                     print(f"Reintentando enviar el mensaje al servidor {self.connection}")
                     pass             
-               
-            
+
+
+    def recv(self, buff_size):
+        recv_msg, emi_addr = self.socket_UDP.recvfrom(1024)  
+        if self.msg_count == 0:
+            #inicio de la comunicación, el primer mensaje
+            parsed = self.parse_segment(recv_msg)
+            if (b"INFO" == parsed[b"m_type"]) and (emi_addr == self.connection):
+                # guardamos el largo que tendrá, así como dejamos todo listo para la comunicación
+                self.tot = int(parsed[b"m_fin"].decode())
+                self.act_count = 0
+                self.sequence = int(parsed[b"m_seq"].decode())
+                self.msg_count += 1
+                # Respondemos que todo llegó bien
+                parsed[b"m_type"] = b"ACK"
+                rs = self.create_segment(parsed)
+                self.socket_UDP.sendto(rs, self.connection)
+        recieved = len(self.all_msg)
+        # Comienza a llegar el resto de información
+        while (recieved < min(self.tot, buff_size)):
+            # recibimos mensajes y verificamos de que sean la continuación de lo anterior
+            segment, emi_addr = self.socket_UDP.recvfrom(1024)
+            msg_dict = self.parse_segment(segment)
+            if (b"DATA" == msg_dict[b"m_type"]) and (self.sequence == int(msg_dict[b"m_seq"].decode())):
+                self.all_msg += msg_dict[b"body"]
+                largo = int(msg_dict[b"m_len"].decode())
+                recieved += largo
+                self.act_count += largo
+                self.sequence += largo
+
+                # enviamos la respuesta de que todo llegó bien
+                pack = {
+                            b"m_type": (b"ACK"),
+                            b"m_len": str(0).encode(),
+                            b"m_seq": str(self.sequence).encode(),
+                            b"m_fin": b"-1",
+                            b"body": b""
+                        }
+                env = self.create_segment(pack)
+                self.socket_UDP.sendto(env, emi_addr)
+
+                if (self.act_count == self.tot):
+                    break
+
+        rec = self.all_msg
+        
+        if len(rec) > buff_size:
+            self.all_msg = rec[buff_size:]
+            return rec[:buff_size]
+        else: 
+            self.all_msg = b""
+            return rec
+
+
