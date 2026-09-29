@@ -8,7 +8,7 @@ class SocketTCP:
         self.address = None
         self.connection = None
         self.sequence = None
-        self.options = [b"ACK", b"SYN", b"ACK+SYN", b"FIN", b"ACK+FIN"]
+        self.options = [b"ACK", b"SYN", b"ACK+SYN", b"FIN", b"ACK+FIN", b"DATA", b"INFO"]
         self.timeout = 5
 
     def set_connection(self, connection):
@@ -49,9 +49,10 @@ class SocketTCP:
         # crea un segmento a partir del mensaje
         msg_type =   b"m_type: " + tcp_dict[b"m_type"] + b"\r\n"
         length =   b"m_len: " + tcp_dict[b"m_len"] + b"\r\n"
-        seq = b"m_seq: " + tcp_dict[b"m_seq"] + b"\r\n\r\n"
+        seq = b"m_seq: " + tcp_dict[b"m_seq"] + b"\r\n"
+        fin = b"m_fin: " + tcp_dict[b"m_fin"] + b"\r\n\r\n"
         body = tcp_dict[b"body"]
-        segment = msg_type + length + seq + body
+        segment = msg_type + length + seq + fin + body
         return segment
 
     def bind(self, address):
@@ -67,6 +68,7 @@ class SocketTCP:
             b"m_type": b"SYN",
             b"m_len": b"0",
             b"m_seq": str(n).encode(),
+            b"m_fin": str(-1).encode(),
             b"body": b""
         }
         segment = self.create_segment(ini_dict)
@@ -87,6 +89,7 @@ class SocketTCP:
                 b"m_type": b"ACK",
                 b"m_len": b"0",
                 b"m_seq": str(seq).encode(),
+                b"m_fin": str(-1).encode(),
                 b"body": b""
             }
             segment = self.create_segment(ack_dict)
@@ -120,6 +123,7 @@ class SocketTCP:
                 b"m_type": b"SYN+ACK",
                 b"m_len": b"0",
                 b"m_seq": str(seq).encode(),
+                b"m_fin": str(-1).encode(),
                 b"body": b""
             }
             print(ini_dict)
@@ -143,6 +147,9 @@ class SocketTCP:
         puntero = -1
         fin = len(message)
         # Enviamos el mensaje en trozos de a lo más n=16 bytes
+        # con esto no se pueden enviar mensajes de 0 bytes de contenido, lo cual tiene sentido
+        # nosotros ya realizamos el handshake para comprobar que existe una conexión
+        # por lo que enviar mensajes vacíos sería inutil hasta cierto punto
         while puntero < fin:
             chunck = b""
             if puntero != -1:
