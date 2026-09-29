@@ -1,6 +1,7 @@
 import socket
 import os
 import sys
+from SocketTCP import *
 
 print('Creando socket - Cliente')
 
@@ -37,8 +38,16 @@ while puntero < len(send_message):
     else:
         chunck = send_message[puntero:puntero + chunck_s]
 
-    # se envía mediante el socket,
-    client_socket.sendto(chunck, address)
+    # se parsea como mensaje con headers
+    pack = {
+                b"m_type": b"",
+                b"m_len": str(chunck_s).encode(),
+                b"m_seq": str(1).encode(),
+                b"body": chunck
+            }
+    ns = SocketTCP()
+    red = ns.create_segment(pack)
+    client_socket.sendto(red, address)
 
     #actualizo el puntero para el siguiente trozo
     puntero += chunck_s

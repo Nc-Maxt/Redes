@@ -1,4 +1,5 @@
 import socket
+from SocketTCP import *
 
 
 
@@ -24,5 +25,7 @@ if __name__ == "__main__":
         # En vez de aceptar una conexión, recibimos un mensaje desde el socket
         # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
         recv_message, client_address = server_socket.recvfrom(buff_size)
+        ns = SocketTCP()
+        red = ns.parse_segment(recv_message)
 
-        print(f'{recv_message}')
+        print(f'{red[b"body"].decode()}')
