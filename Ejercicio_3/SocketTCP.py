@@ -1,7 +1,6 @@
 # archivo donde se creará la clase SpcketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
 import socket
-import numpy as np
 
 class SocketTCP:
     def __init__(self):
