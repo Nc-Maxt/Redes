@@ -157,6 +157,7 @@ class SocketTCP:
         # con esto no se pueden enviar mensajes de 0 bytes de contenido, lo cual tiene sentido
         # nosotros ya realizamos el handshake para comprobar que existe una conexión
         # por lo que enviar mensajes vacíos sería inutil hasta cierto punto
+        print(f"Enviando mensaje de largo {len(message)} al servidor {self.connection}")
         while puntero < fin:
             chunck = b""
             if puntero != -1:
@@ -178,16 +179,19 @@ class SocketTCP:
                     }
             new_seq = int(self.sequence) + len(chunck)
             red = self.create_segment(pack)
+            print("Comienza el intento de enviar la información al servidor")
             while True:
                 try:
                     # intentamos enviar el mensaje al servidor, si no se recibe respuesta en el tiempo definido, se lanza una excepción de timeout
                     self.socket_UDP.settimeout(self.timeout)
+                    print(f"Enviando mensaje al servidor {self.connection}")
                     self.socket_UDP.sendto(red, self.connection)
 
                     mensaje, server_address = self.socket_UDP.recvfrom(1024)
 
                     # si se recibe una respuesta, la procesamos
                     r_dict = self.parse_segment(mensaje)
+                    print(f"Recibimos respuesta del servidor {server_address}: {r_dict}")
                     r_seq = int(r_dict[b"m_seq"].decode())
                     if (r_dict[b"m_type"] == b"ACK") and (r_seq == new_seq) and (server_address == self.connection):
                         print(f"Mensaje enviado correctamente al servidor {self.connection}")
@@ -207,10 +211,22 @@ class SocketTCP:
 
 
     def recv(self, buff_size):
+        if (self.msg_count is None) and (self.all_msg != b""):
+            rec = self.all_msg
+
+            if len(rec) > buff_size:
+                self.all_msg = rec[buff_size:]
+                return rec[:buff_size]
+            else:
+                self.all_msg = b""
+                return rec
+
         recv_msg, emi_addr = self.socket_UDP.recvfrom(1024)  
+        print(f"Recibimos mensaje del emisor {emi_addr}: {recv_msg}")
         if self.msg_count == 0:
             #inicio de la comunicación, el primer mensaje
             parsed = self.parse_segment(recv_msg)
+            print(f"Recibimos mensaje del emisor {emi_addr}: {parsed}")
             if (b"INFO" == parsed[b"m_type"]) and (emi_addr == self.connection):
                 # guardamos el largo que tendrá, así como dejamos todo listo para la comunicación
                 self.tot = int(parsed[b"m_fin"].decode())
@@ -246,6 +262,9 @@ class SocketTCP:
                 self.socket_UDP.sendto(env, emi_addr)
 
                 if (self.act_count == self.tot):
+                    self.msg_count = 0
+                    self.tot = None
+                    self.act_count = None
                     break
 
         rec = self.all_msg
