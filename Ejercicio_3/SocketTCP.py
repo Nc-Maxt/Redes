@@ -276,4 +276,54 @@ class SocketTCP:
             self.all_msg = b""
             return rec
 
+    def close(self):
+        # generamos el mensaje FIN para cerrar la conexión
+        fin_dict = {
+            b"m_type": b"FIN",
+            b"m_len": b"0",
+            b"m_seq": str(self.sequence).encode(),
+            b"m_fin": str(-1).encode(),
+            b"body": b""
+        }
+        fin_segment = self.create_segment(fin_dict)
+        self.socket_UDP.sendto(fin_segment, self.connection)
+
+        resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el ACK del servidor
+        parsed_resp = self.parse_segment(resp)
+        if (addr == self.connection) and (parsed_resp[b"m_type"] == b"FIN+ACK") and (int(parsed_resp[b"m_seq"].decode()) == self.sequence + 1):
+            print(f"Cierre de conexión con {self.connection} exitoso")
+            fin_ack_dict = {
+                b"m_type": b"ACK",
+                b"m_len": b"0",
+                b"m_seq": str(self.sequence + 2).encode(),
+                b"m_fin": str(-1).encode(),
+                b"body": b""
+            }
+            fin_ack_segment = self.create_segment(fin_ack_dict)
+            self.socket_UDP.sendto(fin_ack_segment, self.connection)
+            self.socket_UDP.close()
+
+    def recv_close(self):
+
+        resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el FIN del servidor
+        parsed_resp = self.parse_segment(resp)
+        if (addr == self.connection) and (parsed_resp[b"m_type"] == b"FIN") and (int(parsed_resp[b"m_seq"].decode()) == self.sequence):
+            print(f"Cierre de conexión con {self.connection} exitoso")
+            fin_ack_dict = {
+                b"m_type": b"FIN+ACK",
+                b"m_len": b"0",
+                b"m_seq": str(self.sequence + 1).encode(),
+                b"m_fin": str(-1).encode(),
+                b"body": b""
+            }
+            fin_ack_segment = self.create_segment(fin_ack_dict)
+            self.socket_UDP.sendto(fin_ack_segment, self.connection)
+
+            ack_resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el ACK del servidor
+            parsed_ack_resp = self.parse_segment(ack_resp)
+            if (addr == self.connection) and (parsed_ack_resp[b"m_type"] == b"ACK") and (int(parsed_ack_resp[b"m_seq"].decode()) == self.sequence + 2):
+                print(f"Cierre de conexión con {self.connection} exitoso")
+                # cerramos el socket
+                self.socket_UDP.close()
+
 
