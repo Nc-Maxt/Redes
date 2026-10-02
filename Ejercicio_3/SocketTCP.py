@@ -252,7 +252,7 @@ class SocketTCP:
                 self.all_msg = b""
                 return rec
 
-        if self.msg_count == 0:
+        while self.msg_count == 0:
             recv_msg, emi_addr = self.socket_UDP.recvfrom(1024)  
             #inicio de la comunicación, el primer mensaje
             parsed = self.parse_segment(recv_msg)
@@ -266,6 +266,7 @@ class SocketTCP:
                 # Respondemos que todo llegó bien
                 parsed[b"m_type"] = b"ACK"
                 rs = self.create_segment(parsed)
+                self.last_msg = rs
                 self.socket_UDP.sendto(rs, self.connection)
             # si tengo msg_count = 0 quiere decir que no hay un mensaje enviandose activamente,
             # por lo que si llega un FIN, es porque el emisor quiere cerrar la conexión
@@ -280,34 +281,39 @@ class SocketTCP:
             segment, emi_addr = self.socket_UDP.recvfrom(1024)
             print(f"Recibimos mensaje del emisor {emi_addr}: {segment}")
             msg_dict = self.parse_segment(segment)
-            print()
-            if (b"DATA" == msg_dict[b"m_type"]) and (self.sequence == int(msg_dict[b"m_seq"].decode())):
-                self.all_msg += msg_dict[b"body"]
-                largo = int(msg_dict[b"m_len"].decode())
-                recieved += largo
-                self.act_count += largo
-                self.sequence += largo
+            if (b"DATA" == msg_dict[b"m_type"]):
+                if (self.sequence == int(msg_dict[b"m_seq"].decode())):
+                    self.all_msg += msg_dict[b"body"]
+                    largo = int(msg_dict[b"m_len"].decode())
+                    recieved += largo
+                    self.act_count += largo
+                    self.sequence += largo
 
-                # enviamos la respuesta de que todo llegó bien
-                pack = {
-                            b"m_type": (b"ACK"),
-                            b"m_len": str(0).encode(),
-                            b"m_seq": str(self.sequence).encode(),
-                            b"m_fin": b"-1",
-                            b"body": b""
-                        }
-                env = self.create_segment(pack)
-                print(f"Enviamos mensaje de respuesta al emisor {emi_addr}: {env}")
-                self.socket_UDP.sendto(env, emi_addr)
+                    # enviamos la respuesta de que todo llegó bien
+                    pack = {
+                                b"m_type": (b"ACK"),
+                                b"m_len": str(0).encode(),
+                                b"m_seq": str(self.sequence).encode(),
+                                b"m_fin": b"-1",
+                                b"body": b""
+                            }
+                    env = self.create_segment(pack)
+                    self.last_msg = env
+                    print(f"Enviamos mensaje de respuesta al emisor {emi_addr}: {env}")
+                    self.socket_UDP.sendto(env, emi_addr)
 
-                if (self.act_count == self.tot):
-                    self.msg_count = 0
-                    self.tot = None
-                    self.act_count = None
-                    break
+                    if (self.act_count == self.tot):
+                        self.msg_count = 0
+                        self.tot = None
+                        self.act_count = None
+                        break
+                elif (self.sequence > int(msg_dict[b"m_seq"].decode())):
+                    # si el número de secuencia esperado es mayor al recibido, reenviamos el último mensaje enviado
+                    self.socket_UDP.sendto(self.last_msg, emi_addr)
+            elif (b"INFO" == msg_dict[b"m_type"]) and (emi_addr == self.connection) and (int(msg_dict[b"m_seq"].decode()) == self.sequence):
+                self.socket_UDP.sendto(self.last_msg, emi_addr)
 
         rec = self.all_msg
-        
         if len(rec) > buff_size:
             self.all_msg = rec[buff_size:]
             return rec[:buff_size]
