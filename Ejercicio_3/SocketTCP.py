@@ -242,6 +242,8 @@ class SocketTCP:
 
 
     def recv(self, buff_size):
+        # el receptor espera sin límite, los reenvíos son responsabilidad del emisor
+        self.socket_UDP.settimeout(None)
         if (self.msg_count == 0) and (self.all_msg != b""):
             rec = self.all_msg
 
@@ -273,6 +275,9 @@ class SocketTCP:
             elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"FIN") and (int(parsed[b"m_seq"].decode()) == self.sequence):
                 self.recv_close()
                 return None
+            #caso el ultimo DATA que llegó se mandó repetido 
+            elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"DATA") and (int(parsed[b"m_seq"].decode()) < self.sequence):
+                self.socket_UDP.sendto(self.last_msg, emi_addr)
 
         recieved = len(self.all_msg)
         # Comienza a llegar el resto de información

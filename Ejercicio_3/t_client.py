@@ -1,4 +1,11 @@
+# python3 t_client.py --perdidas  #activa pérdidas aleatorias
+# python3 t_client.py #funcionamiento normal, sin pérdidas
+import sys
 import SocketTCP
+import perdidas
+
+if "--perdidas" in sys.argv:
+    perdidas.activar()
 
 address = ("localhost", 5000)
 

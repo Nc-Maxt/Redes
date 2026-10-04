@@ -1,4 +1,13 @@
+# ===== [PERDIDAS] (ver perdidas.py) =====
+# python3 t_sv.py --perdidas  → activa pérdidas aleatorias (ambas direcciones si cliente y servidor lo usan)
+# python3 t_sv.py             → funcionamiento normal, sin pérdidas
+import sys
 import SocketTCP
+import perdidas
+
+if "--perdidas" in sys.argv:
+    perdidas.activar()
+# ===== [PERDIDAS] fin =====
 
 address = ("localhost", 5000)
 
