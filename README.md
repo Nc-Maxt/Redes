@@ -4,12 +4,14 @@ Tareas del curso de Redes (CC4303). Todo está hecho en Python con la librería 
 
 ## Qué hay en cada carpeta
 
-| Carpeta | Qué es |
-|---|---|
-| `orientados_Socket/` | Cliente y servidor con TCP (orientado a conexión). Ejemplo básico. |
+
+| Carpeta                        | Qué es                                                                |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `orientados_Socket/`           | Cliente y servidor con TCP (orientado a conexión). Ejemplo básico.    |
 | `No_orientados_Sockets (ex1)/` | Cliente y servidor con UDP (no orientado a conexión). Ejemplo básico. |
-| `Ejercicio_1/` | Servidor HTTP y proxy HTTP. |
-| `Ejercicio_2/` | Resolver DNS. |
+| `Ejercicio_1/`                 | Servidor HTTP y proxy HTTP.                                           |
+| `Ejercicio_2/`                 | Resolver DNS.                                                         |
+
 
 ## Ejemplos básicos de sockets
 
@@ -27,12 +29,16 @@ El cliente pide que escribas un mensaje y lo manda al servidor. Ambos usan `loca
 
 ## Ejercicio 1: servidor HTTP y proxy
 
+
+
 ### `protocolos.py`
 
 Tiene las funciones que arman y desarman mensajes HTTP:
 
 - `parse_HTTP_message(bytes)` toma un mensaje HTTP y lo convierte en un diccionario.
 - `create_HTTP_message(dict)` hace lo contrario: toma el diccionario y arma el mensaje en bytes.
+
+
 
 ### `servidor_HTTP_1.py`
 
@@ -42,6 +48,8 @@ Servidor HTTP simple. Escucha, recibe una petición y siempre responde con el ar
 cd Ejercicio_1
 python3 servidor_HTTP_1.py
 ```
+
+
 
 ### `servidor_proxy.py`
 
@@ -71,6 +79,8 @@ El archivo `assets/prohibidos.json` se ve así:
 }
 ```
 
+
+
 ## Ejercicio 2: resolver DNS
 
 Un resolver escucha peticiones DNS en `localhost:8000` y las contesta. Hay tres versiones que van de menos a más:
@@ -97,6 +107,45 @@ pip install dnslib
 ```
 
 > Nota: `protocolos.py` de este ejercicio apunta al resolver local `127.0.0.53`. Para usar un servidor raíz de verdad hay que cambiar la variable `root_ip`.
+
+
+
+## Ejercicio 3: Stop & Wait
+
+`SocketTCP.py` implementa un socket orientado a conexión sobre UDP (handshake, Stop & Wait y cierre). `cliente.py` envía un archivo a `servidor.py` usando esa clase.
+
+Se ejecuta en dos terminales, primero el servidor (escucha en `localhost:8000`):
+
+```bash
+cd Ejercicio_3
+
+# terminal 1
+python3 servidor.py
+
+# terminal 2
+python3 cliente.py localhost 8000 < archivo.txt
+```
+
+El archivo llega por la entrada estándar (`< archivo.txt`), no como argumento. El servidor imprime el contenido recibido.
+
+Flags opcionales (se pueden usar en cliente y servidor). En `cliente.py` van siempre después de `localhost 8000`:
+
+| Flag | Qué hace | Por defecto |
+|---|---|---|
+| `--perdidas` | Simula pérdidas a mano con `perdidas.py`. Usarlo en ambos lados para tener pérdidas en las dos direcciones. | Desactivado: sin pérdidas y timeout de 5 s (`SocketTCP.py`). |
+| `--loss=X` | Tasa de pérdida entre 0 y 1 (ej. `0.4` = 40%). Solo tiene efecto junto a `--perdidas`. | `0.2` (`LOSS_RATE` en `perdidas.py`) |
+| `--timeout=X` | Timeout de reenvío en segundos. Solo tiene efecto junto a `--perdidas`. | `0.5` (`TIMEOUT` en `perdidas.py`) |
+| `--debug` | Muestra los mensajes `[DEBUG]` de envíos, timeouts y reenvíos. | Desactivado |
+
+```bash
+# pérdidas con los valores por defecto (20%, timeout 0.5 s)
+python3 servidor.py --perdidas --debug
+python3 cliente.py localhost 8000 --perdidas --debug < ejemplo.txt
+
+# pérdidas personalizadas (usar los mismos valores en ambos lados)
+python3 servidor.py --perdidas --loss=0.4 --timeout=1
+python3 cliente.py localhost 8000 --perdidas --loss=0.4 --timeout=1 < ejemplo.txt
+```
 
 ## Cómo correr el servidor en la VM (VirtualBox)
 

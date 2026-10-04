@@ -2,6 +2,7 @@
 
 import random
 import socket
+import sys
 
 # guardamos la clase original antes de reemplazarla
 socket_original = socket.socket
@@ -40,6 +41,12 @@ TIMEOUT = 0.5     # timeout de reenvío más corto, para que las pruebas no tard
 
 
 def activar(loss_rate=LOSS_RATE, timeout=TIMEOUT):
+    for arg in sys.argv:
+        if arg.startswith("--loss="):
+            loss_rate = float(arg.split("=")[1])
+        elif arg.startswith("--timeout="):
+            timeout = float(arg.split("=")[1])
+
     SocketConPerdidas.loss_rate = loss_rate
     SocketConPerdidas.timeout_override = timeout
     socket.socket = SocketConPerdidas

@@ -14,6 +14,9 @@ print('Creando socket - Servidor')
 # armamos el socket con nuestra clase
 server_socket = SocketTCP.SocketTCP()
 
+if "--debug" in sys.argv:
+    server_socket.debug = True
+
 # ESTO ABRE EL SOCKET PARA QUE PUEDA RECIBIR DATOS EN LA DIRECCION Y PUERTO INDICADOS
 server_socket.bind(server_socket_address)
 

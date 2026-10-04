@@ -1,4 +1,3 @@
-import os
 import sys
 import perdidas
 import SocketTCP
@@ -11,6 +10,9 @@ if "--perdidas" in sys.argv:
 
 # armamos el socket usando nuestra clase SocketTCP  
 client_socketTCP = SocketTCP.SocketTCP()
+
+if "--debug" in sys.argv:
+    client_socketTCP.debug = True
 
 # Como queremos hacer un socket TCP debemos hacer el 3 way handshake
 # la direccion del servidor se pasa como argumento
