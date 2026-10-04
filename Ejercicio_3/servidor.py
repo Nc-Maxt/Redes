@@ -1,34 +1,36 @@
-import socket
-from SocketTCP import *
+import sys
+import SocketTCP
+import perdidas
 
 
+#si queremos simular perdidas, lo activamos manualmente
+if "--perdidas" in sys.argv:
+    perdidas.activar()
 
-if __name__ == "__main__":
-    # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
-    buff_size = 1024
-    new_socket_address = ('localhost', 5000)
+server_socket_address = ('localhost', 8000)
+buff_size = 1024
 
-    print('Creando socket - Servidor')
-    # armamos el socket
-    # los parámetros que recibe el socket indican el tipo de conexión
-    # socket.SOCK_DGRAM = socket NO orientado a conexión
-    server_socket = SocketTCP()
+print('Creando socket - Servidor')
+# armamos el socket con nuestra clase
+server_socket = SocketTCP.SocketTCP()
 
-    # ESTO ABRE EL SOCKET PARA QUE PUEDA RECIBIR DATOS EN LA DIRECCION Y PUERTO INDICADOS
-    server_socket.bind(new_socket_address)
+# ESTO ABRE EL SOCKET PARA QUE PUEDA RECIBIR DATOS EN LA DIRECCION Y PUERTO INDICADOS
+server_socket.bind(server_socket_address)
 
-    # En este caso, como es un socket NO orientado a conexión, no usamos listen ni accept
+# nos quedamos esperando a que llegue un mensaje
+print('... Esperando clientes')
+while True:
+    # Aquí como queremos hacer hacer TCP debemos dejarlo en aceptar conexiones
+    new_socket, new_socket_address = server_socket.accept()
     
-    # nos quedamos esperando a que llegue un mensaje
-    print('... Esperando clientes')
+    message_received = b""
+
+    #recibimos los mensajes en partes
     while True:
-        # Aquí como queremos hacer hacer TCP debemos dejarlo en aceptar conexiones
-        new_socket, new_socket_address = server_socket.accept()
-        # este es el nuevo socket que recibirá la información de los mensajes con el cliente
+        chunk_i = new_socket.recv(buff_size)
+        #si el chunk llega vacio es porque terminamos
+        if chunk_i is None: 
+            break
+        message_received += chunk_i
 
-        # la función recvfrom entrega una tupla con el mensaje y la dirección del cliente
-        recv_message, client_address = new_socket.socket_UDP.recvfrom(buff_size)
-        ns = SocketTCP()
-        red = ns.parse_segment(recv_message)
-
-        print(f'{red[b"body"].decode()}')
+    print('Message received :', message_received)
