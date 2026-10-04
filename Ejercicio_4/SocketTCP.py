@@ -1,12 +1,17 @@
 # archivo donde se creará la clase SocketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
 import socket
+from slidingWindowCC import SlidingWindowCC
+from socketUDP import SocketUDP
 
 #TCP Tahoe solo considera slow start, congestion avoidance (AIMD) y fast retransmit. 
+STOP_AND_WAIT = "stop_and_wait"
+GO_BACK_N = "go_back_n"
 
 class SocketTCP:
     def __init__(self):
         self.socket_UDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #self.socket_UDP = SocketUDP()
         self.address = None
         self.connection = None
         self.sequence = None
@@ -205,8 +210,19 @@ class SocketTCP:
                             print(f"[DEBUG] Timeout, reintentando enviar mensaje a {client_address}")
                         pass
 
-    def send(self, message):
+    def send(self, message, mode=STOP_AND_WAIT):
+        if mode == STOP_AND_WAIT:
+            self.send_using_stop_and_wait(message)
+        elif mode == GO_BACK_N:
+            self.send_using_go_back_n(message)
 
+    def recv(self, buff_size, mode=STOP_AND_WAIT):
+        if mode == STOP_AND_WAIT:
+            return self.recv_using_stop_and_wait(buff_size)
+        elif mode == GO_BACK_N:
+            return self.recv_using_go_back_n(buff_size)
+        
+    def send_using_stop_and_wait(self, message):
         puntero = -1
         fin = len(message)
         # Enviamos el mensaje en trozos de a lo más n=16 bytes
@@ -268,10 +284,45 @@ class SocketTCP:
                     # el timeout 
                     if self.debug:
                         print(f"[DEBUG] Timeout, reintentando enviar el mensaje al receptor {self.connection}")
-                    pass             
+                    pass   
+
+    def send_using_go_back_n(self, message):
+        ######### EL CODIGO ESTA COPIADO DEL ENUNCIADO, NO SE PUEDE USAR TAL CUAL
+        message_length = str(len(message)).encode()
+        # dividimos el mensaje en trozos de 16 bytes
+        data_list = self.divide_message(message, 16)
+
+        # usamos una ventana para que vean como se usa
+        initial_seq = self.seq
+        data_to_send = SlidingWindowCC(1, [message_length] + data_list, initial_seq)
+        wnd_index = 0
+
+        # partimos armando y enviando el primer segmento
+        current_data = data_to_send.get_data(0)
+        current_seq = data_to_send.get_sequence_number(0)
+        current_segment = self.wrap_data_as_segment(current_data, current_seq)
+
+        while current_data is not None:
+            self.socketUDP.sendto(current_segment, self.destination_address, timer_index=0)
+            try:
+                answer, address = self.socketUDP.recvfrom(self.buff_size)
+                if self.is_valid_ack_stop_and_wait(current_segment, answer):
+                    self.socketUDP.stop_timer(timer_index=0) # solo hay un timer
+                    # actualizamos el segmento
+                    data_to_send.move_window(1)
+                    current_data = data_to_send.get_data(0)
+                    current_seq = data_to_send.get_sequence_number(0)
+                    if current_data is not None:
+                        self.seq = current_seq
+                        current_segment = self.wrap_data_as_segment(current_data, current_seq)
+                        self.socketUDP.sendto(current_segment, self.destination_address, timer_index=0)
+
+            except TimeoutError:
+                self.socketUDP.sendto(current_segment, self.destination_address, timer_index=0)
 
 
-    def recv(self, buff_size):
+
+    def recv_using_stop_and_wait(self, buff_size):
         # el receptor espera sin límite, los reenvíos son responsabilidad del emisor
         self.socket_UDP.settimeout(None)
         if (self.msg_count == 0) and (self.all_msg != b""):
@@ -365,6 +416,9 @@ class SocketTCP:
             self.all_msg = b""
             return rec
 
+    def recv_using_go_back_n(self, buff_size):
+        return None
+
     def close(self):
         # generamos el mensaje FIN para cerrar la conexión
         fin_dict = {
@@ -455,6 +509,3 @@ class SocketTCP:
         if intentos == 3:
             print("Error: No se recibió el ACK del cliente después de 3 intentos. Se asume que el cliente no recibió el FIN+ACK y se cierra la conexión")
             self.socket_UDP.close()
-        
-
-
