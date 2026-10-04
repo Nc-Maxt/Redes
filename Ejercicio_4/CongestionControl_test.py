@@ -43,11 +43,13 @@ def timeout_in_congestion_avoidance_test(congestion_controler, MSS):
 # Ejecute este test
 def congestion_control_object_test(MSS):
     congestion_controler = cc.CongestionControl(MSS)
+    #congestion_controler.debug = True
+
     initialization_test(congestion_controler, MSS)
     ack_test(congestion_controler, MSS)
     timeout_test(congestion_controler, MSS)
     ssthresh_test(congestion_controler, MSS)
     timeout_in_congestion_avoidance_test(congestion_controler, MSS)
 
-MSS = 7
+MSS = 1
 congestion_control_object_test(MSS)

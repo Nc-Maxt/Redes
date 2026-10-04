@@ -1,6 +1,8 @@
-# archivo donde se creará la clase SpcketTCP, que implementa un socket TCP para enviar y recibir mensajes
+# archivo donde se creará la clase SocketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
 import socket
+
+#TCP Tahoe solo considera slow start, congestion avoidance (AIMD) y fast retransmit. 
 
 class SocketTCP:
     def __init__(self):
