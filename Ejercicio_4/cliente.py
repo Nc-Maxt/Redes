@@ -7,6 +7,7 @@ print('Creando socket - Cliente')
 #si queremos simular perdidas, lo activamos manualmente
 if "--perdidas" in sys.argv:
     perdidas.activar()
+MODE = "go_back_n" if "--gbn" in sys.argv else "stop_and_wait"
 
 # armamos el socket usando nuestra clase SocketTCP  
 client_socketTCP = SocketTCP.SocketTCP()
@@ -24,7 +25,7 @@ n_address = client_socketTCP.connection
 # buffer lo lee como bytes
 send_message = sys.stdin.buffer.read()
 
-client_socketTCP.send(send_message) #enviamos el mensaje
+client_socketTCP.send(send_message, MODE) #enviamos el mensaje
 
 print("... Mensaje enviado")
 

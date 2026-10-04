@@ -6,6 +6,7 @@ import perdidas
 #si queremos simular perdidas, lo activamos manualmente
 if "--perdidas" in sys.argv:
     perdidas.activar()
+MODE = "go_back_n" if "--gbn" in sys.argv else "stop_and_wait"
 
 server_socket_address = ('localhost', 8000)
 buff_size = 1024
@@ -30,7 +31,7 @@ while True:
 
     #recibimos los mensajes en partes
     while True:
-        chunk_i = new_socket.recv(buff_size)
+        chunk_i = new_socket.recv(buff_size, MODE)
         #si el chunk llega vacio es porque terminamos
         if chunk_i is None: 
             break
