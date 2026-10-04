@@ -1,5 +1,6 @@
 # archivo donde se creará la clase SpcketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
+import time
 import socket
 
 class SocketTCP:
@@ -336,22 +337,46 @@ class SocketTCP:
             b"body": b""
         }
         fin_segment = self.create_segment(fin_dict)
-        self.socket_UDP.sendto(fin_segment, self.connection)
 
-        resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el ACK del servidor
-        parsed_resp = self.parse_segment(resp)
-        if (addr == self.connection) and (parsed_resp[b"m_type"] == b"FIN+ACK") and (int(parsed_resp[b"m_seq"].decode()) == self.sequence + 1):
-            print(f"Cierre de conexión con {self.connection} exitoso")
-            fin_ack_dict = {
-                b"m_type": b"ACK",
-                b"m_len": b"0",
-                b"m_seq": str(self.sequence + 2).encode(),
-                b"m_fin": str(-1).encode(),
-                b"body": b""
-            }
-            fin_ack_segment = self.create_segment(fin_ack_dict)
-            self.socket_UDP.sendto(fin_ack_segment, self.connection)
-            self.socket_UDP.close()
+        intentos = 0 #cantidad de intentos de enviar el FIN
+        while intentos < 3:
+            try:
+                # seteamos un timeout para esperar la respuesta del ACK del servidor
+                self.socket_UDP.settimeout(self.timeout)
+                self.socket_UDP.sendto(fin_segment, self.connection) #mandamos FIN
+
+                resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el ACK del servidor
+                parsed_resp = self.parse_segment(resp)
+                #caso recibimos el FIN+ACK del servidor
+                if (addr == self.connection) and (parsed_resp[b"m_type"] == b"FIN+ACK") and (int(parsed_resp[b"m_seq"].decode()) == self.sequence + 1):
+                    print(f"Cierre de conexión con {self.connection} exitoso")
+                    fin_ack_dict = {
+                        b"m_type": b"ACK",
+                        b"m_len": b"0",
+                        b"m_seq": str(self.sequence + 2).encode(),
+                        b"m_fin": str(-1).encode(),
+                        b"body": b""
+                    }
+                    fin_ack_segment = self.create_segment(fin_ack_dict)
+                    #mandamos 3 veces el ultimo ACK con un timeout entremedio
+                    for i in range(3):
+                        self.socket_UDP.sendto(fin_ack_segment, self.connection)
+                        try:
+                            #el server ya no respondera nada mas, por lo que el timeout se triggereara siempre
+                            print("Enviando ultimo ACK 3 veces, intento ", i+1)
+                            self.socket_UDP.recvfrom(1024) 
+                        except socket.timeout:
+                            pass
+                    self.socket_UDP.close()
+                    break
+            #caso timeout, reintentamos enviar el FIN
+            except socket.timeout:
+                print(f"Timeout, reintentando enviar FIN a {self.connection}")
+                intentos += 1
+                pass
+            if intentos == 3:
+                print("Error: No se recibió el ACK del servidor después de 3 intentos. Se asume que el servidor no recibió el FIN y se cierra la conexión")
+                self.socket_UDP.close()
 
     def recv_close(self):
         print(f"Solicitud de cierre de conexión con {self.connection} exitosa")
@@ -365,13 +390,27 @@ class SocketTCP:
         }
 
         fin_ack_segment = self.create_segment(fin_ack_dict)
-        self.socket_UDP.sendto(fin_ack_segment, self.connection)
-
-        ack_resp, addr = self.socket_UDP.recvfrom(1024)  # esperamos el ACK del servidor
-        parsed_ack_resp = self.parse_segment(ack_resp)
-        if (addr == self.connection) and (parsed_ack_resp[b"m_type"] == b"ACK") and (int(parsed_ack_resp[b"m_seq"].decode()) == self.sequence + 1):
-            print(f"Cierre de conexión con {self.connection} exitoso")
-            # cerramos el socket
+        
+        intentos = 0 #cantidad de intentos de enviar el FIN+ACK
+        while intentos < 3:
+            try:
+                self.socket_UDP.settimeout(self.timeout)
+                self.socket_UDP.sendto(fin_ack_segment, self.connection)
+                #esperamos el ACK del cliente
+                ack_resp, addr = self.socket_UDP.recvfrom(1024) 
+                parsed_ack_resp = self.parse_segment(ack_resp)
+                if (addr == self.connection) and (parsed_ack_resp[b"m_type"] == b"ACK") and (int(parsed_ack_resp[b"m_seq"].decode()) == self.sequence + 1):
+                    print(f"Cierre de conexión con {self.connection} exitoso")
+                    # cerramos el socket
+                    self.socket_UDP.close()
+                    break
+            except socket.timeout:
+                print(f"Timeout, reintentando enviar FIN+ACK a {self.connection}")
+                intentos += 1
+                pass
+        if intentos == 3:
+            print("Error: No se recibió el ACK del cliente después de 3 intentos. Se asume que el cliente no recibió el FIN+ACK y se cierra la conexión")
             self.socket_UDP.close()
+        
 
 
