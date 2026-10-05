@@ -50,3 +50,16 @@ def activar(loss_rate=LOSS_RATE, timeout=TIMEOUT):
     SocketConPerdidas.loss_rate = loss_rate
     SocketConPerdidas.timeout_override = timeout
     socket.socket = SocketConPerdidas
+
+    # SocketUDP nunca llama al settimeout del socket interno (usa timers propios),
+    # así que el override también se aplica a sus timers, sin tocar socketUDP.py
+    import socketUDP
+    settimeout_original = socketUDP.SocketUDP.settimeout
+
+    def settimeout_con_override(self, t):
+        # solo se acortan timeouts positivos; -1 sigue significando "sin timers"
+        if t is not None and t > 0:
+            t = SocketConPerdidas.timeout_override
+        return settimeout_original(self, t)
+
+    socketUDP.SocketUDP.settimeout = settimeout_con_override
