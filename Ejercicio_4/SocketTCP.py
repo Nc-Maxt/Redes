@@ -1,6 +1,7 @@
 # archivo donde se creará la clase SocketTCP, que implementa un socket TCP para enviar y recibir mensajes
 import random
 import socket
+import CongestionControl
 from slidingWindowCC import SlidingWindowCC
 from socketUDP import SocketUDP
 
@@ -10,8 +11,7 @@ GO_BACK_N = "go_back_n"
 
 class SocketTCP:
     def __init__(self):
-        self.socket_UDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.socket_UDP = SocketUDP()
+        self.socket_UDP = SocketUDP()
         self.address = None
         self.connection = None
         self.sequence = None
@@ -19,6 +19,7 @@ class SocketTCP:
         self.timeout = 5
         self.buffer_size = 68 + 16 #enunciado
         self.debug = False
+        self.congestion_control_on = False
 
         self.tot = None
         self.all_msg = b""
@@ -43,6 +44,9 @@ class SocketTCP:
 
     def increment_sequence(self, value):
         self.sequence += value
+
+    def set_congestion_control(self, value: bool):
+        self.congestion_control_on = value
 
     @staticmethod
     def parse_segment(segment):
@@ -253,13 +257,13 @@ class SocketTCP:
             new_seq = int(self.sequence) + len(chunck)
             red = self.create_segment(pack)
             if self.debug:
-                print("[DEBUG] Comienza el intento de enviar la información al receptor")
+                print("[DEBUG] send_using_stop_and_wait: Comienza el intento de enviar la información al receptor")
             while True:
                 try:
                     # intentamos enviar el mensaje al receptor, si no se recibe respuesta en el tiempo definido, se lanza una excepción de timeout
                     self.socket_UDP.settimeout(self.timeout)
                     if self.debug:
-                        print(f"[DEBUG] Enviando mensaje al receptor {self.connection}")
+                        print(f"[DEBUG] send_using_stop_and_wait: Enviando mensaje al receptor {self.connection}")
                     self.socket_UDP.sendto(red, self.connection)
 
                     mensaje, server_address = self.socket_UDP.recvfrom(self.buffer_size)
@@ -267,7 +271,7 @@ class SocketTCP:
                     # si se recibe una respuesta, la procesamos
                     r_dict = self.parse_segment(mensaje)
                     if self.debug:
-                        print(f"[DEBUG] Recibimos respuesta del receptor {server_address}: {r_dict}")
+                        print(f"[DEBUG] send_using_stop_and_wait: Recibimos respuesta del receptor {server_address}: {r_dict}")
                     r_seq = int(r_dict[b"m_seq"].decode())
                     if (r_dict[b"m_type"] == b"ACK") and (r_seq == new_seq) and (server_address == self.connection):
                         if self.debug:
@@ -286,7 +290,81 @@ class SocketTCP:
                         print(f"[DEBUG] Timeout, reintentando enviar el mensaje al receptor {self.connection}")
                     pass   
 
-    def send_using_go_back_n(self, message):
+    def send_using_go_back_n(self, message: bytes):
+        puntero = -1
+        fin = len(message)
+        mss = 8 #bytes
+        data_list = []
+        # Enviamos el mensaje en trozos de a lo más n=8 bytes
+        # se reutiliza el codigo de stop & wait porque es lo mismo 
+        if self.debug:
+            print(f"[DEBUG] Enviando mensaje de largo {len(message)} al servidor {self.connection}")
+        while puntero < fin:
+            chunk = b""
+            if puntero != -1:
+                # se define el tamaño de los trozos a enviar
+                chunk_s = mss
+                # se obtiene el trozo a enviar
+                if puntero + chunk_s > len(message):
+                    chunk = message[puntero:]
+                    
+                else:
+                    chunk = message[puntero:puntero + chunk_s]
+                data_list.append(chunk)
+
+        data_window = SlidingWindowCC(8, data_list, self.seq)   
+                   
+        #creamos un objeto tipo CongestionControl con MSS de 8 bytes.
+        congestion_controler = CongestionControl(mss)
+        
+        #el mensaje lo partimos en n partes de MSS = 8 bytes 
+        data_list = []
+        n = len(message) % int(mss) #cuantos 
+        data_list = message.split(None, n)
+
+        # seteamos timeout para el SocketUDP
+        self.socket_UDP_gbn.settimeout(self.timeout)
+
+        #inicializamos la ventana de envío
+        data_window = SlidingWindowCC(1, [len(message)] + data_list, self.seq)
+
+        #primer segmento
+        current_data = data_window.get_data(0)
+        current_seq = data_window.get_sequence_number(0)
+        new_seq = int(self.sequence) + len(current_seq)
+
+        current_segment = self.create_segment(current_data)
+
+        while current_data is not None:
+            try:
+                self.socket_UDP_gbn.settimeout(self.timeout)
+                if self.debug:
+                        print(f"[DEBUG] send_using_go_back_n: Enviando mensaje al receptor {self.connection}")
+                self.socket_UDP_gbn.sendto(current_segment, self.connection)
+
+                while True:
+                    mensaje, server_address = self.socket_UDP_gbn.recvfrom(self.buffer_size)
+                    # si se recibe una respuesta, la procesamos
+                    r_dict = self.parse_segment(mensaje)
+                    if self.debug:
+                        print(f"[DEBUG] send_using_stop_and_wait: Recibimos respuesta del receptor {server_address}: {r_dict}")
+                    r_seq = int(r_dict[b"m_seq"].decode())
+                    if (r_dict[b"m_type"] == b"ACK") and (r_seq == new_seq) and (server_address == self.connection):
+                        if self.debug:
+                            print(f"[DEBUG] Mensaje enviado correctamente al receptor {self.connection}")
+                        self.sequence = new_seq
+                        self.socketUDP.stop_timer(timer_index=0)
+                        # actualizo el puntero para el siguiente mensaje a enviar
+                        data_window.move_window(1)
+                        current_data = data_window.get_data(0)
+                        current_seq = data_window.get_sequence_number(0)
+            # en caso de que no llegue la respuesta esperada, se triggerea el timeout y se vuelve a enviar el mensaje
+            except socket.timeout:
+                # el timeout 
+                if self.debug:
+                    print(f"[DEBUG] Timeout, reintentando enviar el mensaje al receptor {self.connection}")
+                pass   
+        '''
         ######### EL CODIGO ESTA COPIADO DEL ENUNCIADO, NO SE PUEDE USAR TAL CUAL
         message_length = str(len(message)).encode()
         # dividimos el mensaje en trozos de 16 bytes
@@ -319,12 +397,12 @@ class SocketTCP:
 
             except TimeoutError:
                 self.socketUDP.sendto(current_segment, self.destination_address, timer_index=0)
-
+        '''
 
 
     def recv_using_stop_and_wait(self, buff_size):
         # el receptor espera sin límite, los reenvíos son responsabilidad del emisor
-        self.socket_UDP.settimeout(None)
+        self.socket_UDP.settimeout(-1)
         if (self.msg_count == 0) and (self.all_msg != b""):
             rec = self.all_msg
 
@@ -417,7 +495,98 @@ class SocketTCP:
             return rec
 
     def recv_using_go_back_n(self, buff_size):
-        return None
+        # el receptor espera sin límite, los reenvíos son responsabilidad del emisor
+        self.socket_UDP.settimeout(None)
+        if (self.msg_count == 0) and (self.all_msg != b""):
+            rec = self.all_msg
+
+            if len(rec) > buff_size:
+                self.all_msg = rec[buff_size:]
+                return rec[:buff_size]
+            else:
+                self.all_msg = b""
+                return rec
+
+        while self.msg_count == 0:
+            recv_msg, emi_addr = self.socket_UDP.recvfrom(self.buffer_size)  
+            #inicio de la comunicación, el primer mensaje
+            parsed = self.parse_segment(recv_msg)
+            if self.debug:
+                print(f"[DEBUG] Recibimos mensaje del emisor {emi_addr}: {parsed}")
+            if (b"INFO" == parsed[b"m_type"]) and (emi_addr == self.connection):
+                # guardamos el largo que tendrá, así como dejamos todo listo para la comunicación
+                self.tot = int(parsed[b"m_fin"].decode())
+                self.act_count = 0
+                self.sequence = int(parsed[b"m_seq"].decode())
+                self.msg_count = 1
+                # Respondemos que todo llegó bien
+                parsed[b"m_type"] = b"ACK"
+                rs = self.create_segment(parsed)
+                self.last_msg = rs
+                self.socket_UDP.sendto(rs, self.connection)
+            # si tengo msg_count = 0 quiere decir que no hay un mensaje enviandose activamente,
+            # por lo que si llega un FIN, es porque el emisor quiere cerrar la conexión
+            elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"FIN") and (int(parsed[b"m_seq"].decode()) == self.sequence):
+                self.recv_close()
+                return None
+            #caso el ultimo DATA que llegó se mandó repetido 
+            elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"DATA") and (int(parsed[b"m_seq"].decode()) < self.sequence):
+                if self.debug:
+                    print("[DEBUG] DATA repetido (fuera de recepción): se perdió nuestro ACK, reenviando el último ACK")
+                self.socket_UDP.sendto(self.last_msg, emi_addr)
+
+        recieved = len(self.all_msg)
+        # Comienza a llegar el resto de información
+        while (recieved < min(self.tot, buff_size)):
+            # recibimos mensajes y verificamos de que sean la continuación de lo anterior
+            segment, emi_addr = self.socket_UDP.recvfrom(self.buffer_size)
+            if self.debug:
+                print(f"[DEBUG] Recibimos mensaje del emisor {emi_addr}: {segment}")
+            msg_dict = self.parse_segment(segment)
+            if (b"DATA" == msg_dict[b"m_type"]):
+                if (self.sequence == int(msg_dict[b"m_seq"].decode())):
+                    self.all_msg += msg_dict[b"body"]
+                    largo = int(msg_dict[b"m_len"].decode())
+                    recieved += largo
+                    self.act_count += largo
+                    self.sequence += largo
+
+                    # enviamos la respuesta de que todo llegó bien
+                    pack = {
+                                b"m_type": (b"ACK"),
+                                b"m_len": str(0).encode(),
+                                b"m_seq": str(self.sequence).encode(),
+                                b"m_fin": b"-1",
+                                b"body": b""
+                            }
+                    env = self.create_segment(pack)
+                    self.last_msg = env
+                    if self.debug:
+                        print(f"[DEBUG] Enviamos mensaje de respuesta al emisor {emi_addr}: {env}")
+                    self.socket_UDP.sendto(env, emi_addr)
+
+                    if (self.act_count == self.tot):
+                        self.msg_count = 0
+                        self.tot = None
+                        self.act_count = None
+                        break
+                elif (self.sequence > int(msg_dict[b"m_seq"].decode())):
+                    # si el número de secuencia esperado es mayor al recibido, reenviamos el último mensaje enviado
+                    if self.debug:
+                        print("[DEBUG] DATA repetido: se perdió nuestro ACK, reenviando el último ACK")
+                    self.socket_UDP.sendto(self.last_msg, emi_addr)
+            elif (b"INFO" == msg_dict[b"m_type"]) and (emi_addr == self.connection) and (int(msg_dict[b"m_seq"].decode()) == self.sequence):
+                if self.debug:
+                    print("[DEBUG] INFO repetido: se perdió nuestro ACK del INFO, reenviándolo")
+                self.socket_UDP.sendto(self.last_msg, emi_addr)
+
+        rec = self.all_msg
+        if len(rec) > buff_size:
+            self.all_msg = rec[buff_size:]
+            return rec[:buff_size]
+        else: 
+            self.all_msg = b""
+            return rec
 
     def close(self):
         # generamos el mensaje FIN para cerrar la conexión
