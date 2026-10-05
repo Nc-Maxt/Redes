@@ -48,6 +48,27 @@ class SocketTCP:
     def set_congestion_control(self, value: bool):
         self.congestion_control_on = value
 
+    def parar_timer(self):
+        # SocketUDP no detiene sus timers solo: hay que pararlo a mano cuando llega lo esperado o tras un timeout
+        # (si no se para tras un timeout, el siguiente sendto intenta reiniciar un Timer ya usado y falla)
+        # stop_timer falla si no hay timer creado, por eso se revisa antes
+        if self.socket_UDP.timer_list[0] is not None:
+            self.socket_UDP.stop_timer(0)
+
+    def enviar(self, segment, address):
+        # si el timer ya cumplió su timeout pero no alcanzamos a pararlo (llegó un mensaje justo antes),
+        # SocketUDP intentaría reiniciar un Timer ya usado y falla, así que lo reseteamos antes de enviar
+        timer = self.socket_UDP.timer_list[0]
+        if timer is not None and not timer.is_alive():
+            self.socket_UDP.stop_timer(0)
+        try:
+            self.socket_UDP.sendto(segment, address)
+        except RuntimeError:
+            # el timer venció justo mientras enviábamos: el segmento ya salió pero no se pudo reiniciar el timer.
+            # como igual correspondía reenviar por timeout, reseteamos el timer y reenviamos (el receptor maneja duplicados)
+            self.socket_UDP.stop_timer(0)
+            self.socket_UDP.sendto(segment, address)
+
     @staticmethod
     def parse_segment(segment):
         # parsea el segmento recibido y devuelve el mensaje y la dirección del cliente
@@ -106,7 +127,7 @@ class SocketTCP:
         while not self.connected:
             try:
                 self.socket_UDP.settimeout(self.timeout)
-                self.socket_UDP.sendto(segment, address)
+                self.enviar(segment, address)
 
                 # esperamos a que llegue el SYN+ACK del servidor
                 if self.debug:
@@ -130,12 +151,15 @@ class SocketTCP:
                     self.last_msg = segment
                     if self.debug:
                         print(f"[DEBUG] Mandamos mensaje devuelta a {info_add}")
-                    self.socket_UDP.sendto(segment, info_add)
+                    self.enviar(segment, info_add)
+                    # el ACK final no espera respuesta, así que paramos el timer
+                    self.parar_timer()
                     # guardamos la dirección del servidor para luego enviarle los mensajes
                     self.connected = 1
                     self.set_connection(info_add)
                     print(f"Conexión cliente-sv establecida con {info_add[0]}:{info_add[1]}")
-            except socket.timeout:
+            except TimeoutError:
+                self.parar_timer()
                 if self.debug:
                     print(f"[DEBUG] Timeout, reintentando conectar con {address}")
                 pass
@@ -180,7 +204,7 @@ class SocketTCP:
                 while not nuevo_socket.connected:
                     try:
                         nuevo_socket.socket_UDP.settimeout(nuevo_socket.timeout)
-                        nuevo_socket.socket_UDP.sendto(syn_ack, client_address)
+                        nuevo_socket.enviar(syn_ack, client_address)
 
                         # esperamos a que llegue el ACK del cliente
                         if self.debug:
@@ -194,6 +218,7 @@ class SocketTCP:
                                 if self.debug:
                                     print(f"[DEBUG] Todo ok, avisamos del nuevo puerto para comunicar {nuevo_socket.address}")
                                 self.sequence = seq + 2
+                                nuevo_socket.parar_timer()
                                 return nuevo_socket, nuevo_socket.address
                             elif (tcp_dict[b"m_type"] == b"SYN"):
                                 # en el caso de que me llegue nuevamente el SYN, quiere decir que el cliente no recibió el SYN+ACK
@@ -207,9 +232,11 @@ class SocketTCP:
                                 if self.debug:
                                     print("[DEBUG] Recibimos un mensaje posterior al handshake")
                                 self.sequence = seq + 2
+                                nuevo_socket.parar_timer()
                                 return nuevo_socket, nuevo_socket.address
                         pass
-                    except socket.timeout:
+                    except TimeoutError:
+                        nuevo_socket.parar_timer()
                         if self.debug:
                             print(f"[DEBUG] Timeout, reintentando enviar mensaje a {client_address}")
                         pass
@@ -264,7 +291,7 @@ class SocketTCP:
                     self.socket_UDP.settimeout(self.timeout)
                     if self.debug:
                         print(f"[DEBUG] send_using_stop_and_wait: Enviando mensaje al receptor {self.connection}")
-                    self.socket_UDP.sendto(red, self.connection)
+                    self.enviar(red, self.connection)
 
                     mensaje, server_address = self.socket_UDP.recvfrom(self.buffer_size)
 
@@ -277,6 +304,7 @@ class SocketTCP:
                         if self.debug:
                             print(f"[DEBUG] Mensaje enviado correctamente al receptor {self.connection}")
                         self.sequence = new_seq
+                        self.parar_timer()
                         # actualizo el puntero para el siguiente mensaje a enviar
                         if puntero == -1:
                             puntero = 0
@@ -284,8 +312,9 @@ class SocketTCP:
                             puntero += chunck_s
                         break
                     # en caso de que no llegue la respuesta esperada, se triggerea el timeout y se vuelve a enviar el mensaje
-                except socket.timeout:
+                except TimeoutError:
                     # el timeout 
+                    self.parar_timer()
                     if self.debug:
                         print(f"[DEBUG] Timeout, reintentando enviar el mensaje al receptor {self.connection}")
                     pass   
@@ -323,7 +352,7 @@ class SocketTCP:
         data_list = message.split(None, n)
 
         # seteamos timeout para el SocketUDP
-        self.socket_UDP_gbn.settimeout(self.timeout)
+        self.socket_UDP.settimeout(self.timeout)
 
         #inicializamos la ventana de envío
         data_window = SlidingWindowCC(1, [len(message)] + data_list, self.seq)
@@ -337,13 +366,13 @@ class SocketTCP:
 
         while current_data is not None:
             try:
-                self.socket_UDP_gbn.settimeout(self.timeout)
+                self.socket_UDP.settimeout(self.timeout)
                 if self.debug:
                         print(f"[DEBUG] send_using_go_back_n: Enviando mensaje al receptor {self.connection}")
-                self.socket_UDP_gbn.sendto(current_segment, self.connection)
+                self.enviar(current_segment, self.connection)
 
                 while True:
-                    mensaje, server_address = self.socket_UDP_gbn.recvfrom(self.buffer_size)
+                    mensaje, server_address = self.socket_UDP.recvfrom(self.buffer_size)
                     # si se recibe una respuesta, la procesamos
                     r_dict = self.parse_segment(mensaje)
                     if self.debug:
@@ -353,14 +382,15 @@ class SocketTCP:
                         if self.debug:
                             print(f"[DEBUG] Mensaje enviado correctamente al receptor {self.connection}")
                         self.sequence = new_seq
-                        self.socketUDP.stop_timer(timer_index=0)
+                        self.parar_timer()
                         # actualizo el puntero para el siguiente mensaje a enviar
                         data_window.move_window(1)
                         current_data = data_window.get_data(0)
                         current_seq = data_window.get_sequence_number(0)
             # en caso de que no llegue la respuesta esperada, se triggerea el timeout y se vuelve a enviar el mensaje
-            except socket.timeout:
+            except TimeoutError:
                 # el timeout 
+                self.parar_timer()
                 if self.debug:
                     print(f"[DEBUG] Timeout, reintentando enviar el mensaje al receptor {self.connection}")
                 pass   
@@ -429,7 +459,7 @@ class SocketTCP:
                 parsed[b"m_type"] = b"ACK"
                 rs = self.create_segment(parsed)
                 self.last_msg = rs
-                self.socket_UDP.sendto(rs, self.connection)
+                self.enviar(rs, self.connection)
             # si tengo msg_count = 0 quiere decir que no hay un mensaje enviandose activamente,
             # por lo que si llega un FIN, es porque el emisor quiere cerrar la conexión
             elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"FIN") and (int(parsed[b"m_seq"].decode()) == self.sequence):
@@ -439,7 +469,7 @@ class SocketTCP:
             elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"DATA") and (int(parsed[b"m_seq"].decode()) < self.sequence):
                 if self.debug:
                     print("[DEBUG] DATA repetido (fuera de recepción): se perdió nuestro ACK, reenviando el último ACK")
-                self.socket_UDP.sendto(self.last_msg, emi_addr)
+                self.enviar(self.last_msg, emi_addr)
 
         recieved = len(self.all_msg)
         # Comienza a llegar el resto de información
@@ -469,7 +499,7 @@ class SocketTCP:
                     self.last_msg = env
                     if self.debug:
                         print(f"[DEBUG] Enviamos mensaje de respuesta al emisor {emi_addr}: {env}")
-                    self.socket_UDP.sendto(env, emi_addr)
+                    self.enviar(env, emi_addr)
 
                     if (self.act_count == self.tot):
                         self.msg_count = 0
@@ -480,11 +510,11 @@ class SocketTCP:
                     # si el número de secuencia esperado es mayor al recibido, reenviamos el último mensaje enviado
                     if self.debug:
                         print("[DEBUG] DATA repetido: se perdió nuestro ACK, reenviando el último ACK")
-                    self.socket_UDP.sendto(self.last_msg, emi_addr)
+                    self.enviar(self.last_msg, emi_addr)
             elif (b"INFO" == msg_dict[b"m_type"]) and (emi_addr == self.connection) and (int(msg_dict[b"m_seq"].decode()) == self.sequence):
                 if self.debug:
                     print("[DEBUG] INFO repetido: se perdió nuestro ACK del INFO, reenviándolo")
-                self.socket_UDP.sendto(self.last_msg, emi_addr)
+                self.enviar(self.last_msg, emi_addr)
 
         rec = self.all_msg
         if len(rec) > buff_size:
@@ -496,7 +526,7 @@ class SocketTCP:
 
     def recv_using_go_back_n(self, buff_size):
         # el receptor espera sin límite, los reenvíos son responsabilidad del emisor
-        self.socket_UDP.settimeout(None)
+        self.socket_UDP.settimeout(-1)
         if (self.msg_count == 0) and (self.all_msg != b""):
             rec = self.all_msg
 
@@ -523,7 +553,7 @@ class SocketTCP:
                 parsed[b"m_type"] = b"ACK"
                 rs = self.create_segment(parsed)
                 self.last_msg = rs
-                self.socket_UDP.sendto(rs, self.connection)
+                self.enviar(rs, self.connection)
             # si tengo msg_count = 0 quiere decir que no hay un mensaje enviandose activamente,
             # por lo que si llega un FIN, es porque el emisor quiere cerrar la conexión
             elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"FIN") and (int(parsed[b"m_seq"].decode()) == self.sequence):
@@ -533,7 +563,7 @@ class SocketTCP:
             elif (emi_addr == self.connection) and (parsed[b"m_type"] == b"DATA") and (int(parsed[b"m_seq"].decode()) < self.sequence):
                 if self.debug:
                     print("[DEBUG] DATA repetido (fuera de recepción): se perdió nuestro ACK, reenviando el último ACK")
-                self.socket_UDP.sendto(self.last_msg, emi_addr)
+                self.enviar(self.last_msg, emi_addr)
 
         recieved = len(self.all_msg)
         # Comienza a llegar el resto de información
@@ -563,7 +593,7 @@ class SocketTCP:
                     self.last_msg = env
                     if self.debug:
                         print(f"[DEBUG] Enviamos mensaje de respuesta al emisor {emi_addr}: {env}")
-                    self.socket_UDP.sendto(env, emi_addr)
+                    self.enviar(env, emi_addr)
 
                     if (self.act_count == self.tot):
                         self.msg_count = 0
@@ -574,11 +604,11 @@ class SocketTCP:
                     # si el número de secuencia esperado es mayor al recibido, reenviamos el último mensaje enviado
                     if self.debug:
                         print("[DEBUG] DATA repetido: se perdió nuestro ACK, reenviando el último ACK")
-                    self.socket_UDP.sendto(self.last_msg, emi_addr)
+                    self.enviar(self.last_msg, emi_addr)
             elif (b"INFO" == msg_dict[b"m_type"]) and (emi_addr == self.connection) and (int(msg_dict[b"m_seq"].decode()) == self.sequence):
                 if self.debug:
                     print("[DEBUG] INFO repetido: se perdió nuestro ACK del INFO, reenviándolo")
-                self.socket_UDP.sendto(self.last_msg, emi_addr)
+                self.enviar(self.last_msg, emi_addr)
 
         rec = self.all_msg
         if len(rec) > buff_size:
@@ -604,7 +634,7 @@ class SocketTCP:
             try:
                 # seteamos un timeout para esperar la respuesta del ACK del servidor
                 self.socket_UDP.settimeout(self.timeout)
-                self.socket_UDP.sendto(fin_segment, self.connection) #mandamos FIN
+                self.enviar(fin_segment, self.connection) #mandamos FIN
 
                 resp, addr = self.socket_UDP.recvfrom(self.buffer_size)  # esperamos el ACK del servidor
                 parsed_resp = self.parse_segment(resp)
@@ -619,20 +649,24 @@ class SocketTCP:
                         b"body": b""
                     }
                     fin_ack_segment = self.create_segment(fin_ack_dict)
+                    # llegó el FIN+ACK, paramos el timer del FIN
+                    self.parar_timer()
                     #mandamos 3 veces el ultimo ACK con un timeout entremedio
                     for i in range(3):
-                        self.socket_UDP.sendto(fin_ack_segment, self.connection)
+                        self.enviar(fin_ack_segment, self.connection)
                         try:
                             #el server ya no respondera nada mas, por lo que el timeout se triggereara siempre
                             if self.debug:
                                 print("[DEBUG] Enviando ultimo ACK 3 veces, intento ", i+1)
                             self.socket_UDP.recvfrom(self.buffer_size) 
-                        except socket.timeout:
-                            pass
+                        except TimeoutError:
+                            self.parar_timer()
+                    self.parar_timer()
                     self.socket_UDP.close()
                     break
             #caso timeout, reintentamos enviar el FIN
-            except socket.timeout:
+            except TimeoutError:
+                self.parar_timer()
                 if self.debug:
                     print(f"[DEBUG] Timeout, reintentando enviar FIN a {self.connection}")
                 intentos += 1
@@ -659,18 +693,20 @@ class SocketTCP:
         while intentos < 3:
             try:
                 self.socket_UDP.settimeout(self.timeout)
-                self.socket_UDP.sendto(fin_ack_segment, self.connection)
+                self.enviar(fin_ack_segment, self.connection)
                 #esperamos el ACK del cliente
                 ack_resp, addr = self.socket_UDP.recvfrom(self.buffer_size) 
                 parsed_ack_resp = self.parse_segment(ack_resp)
                 if (addr == self.connection) and (parsed_ack_resp[b"m_type"] == b"ACK") and (int(parsed_ack_resp[b"m_seq"].decode()) == self.sequence + 1):
                     print(f"Cierre de conexión con {self.connection} exitoso")
                     # cerramos el socket
+                    self.parar_timer()
                     self.socket_UDP.close()
                     break
                 elif self.debug:
                     print(f"[DEBUG] llegó {parsed_ack_resp[b'm_type']} en vez del ACK final (probablemente FIN repetido), reenviando FIN+ACK")
-            except socket.timeout:
+            except TimeoutError:
+                self.parar_timer()
                 if self.debug:
                     print(f"[DEBUG] Timeout, reintentando enviar FIN+ACK a {self.connection}")
                 intentos += 1
