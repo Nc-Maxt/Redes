@@ -13,6 +13,10 @@ MODE = "go_back_n" if "--gbn" in sys.argv else "stop_and_wait"
 
 # CLIENT
 client_socketTCP = SocketTCP.SocketTCP()
+if "--cc" in sys.argv:
+    client_socketTCP.set_congestion_control(True)
+if "--debug" in sys.argv:
+    client_socketTCP.debug = True
 client_socketTCP.connect(address)
 # test 1
 print("Test 1: Sending message of length 16")

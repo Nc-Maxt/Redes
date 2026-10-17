@@ -21,6 +21,8 @@ class SocketTCP:
         self.buffer_size = 68 + 16 #enunciado
         self.debug = False
         self.congestion_control_on = False
+        self.congestion_controler = None
+        self.number_of_sent_segments = 0  # segmentos de datos enviados con Go-Back-N (para comparar con y sin control de congestión)
 
         self.tot = None
         self.all_msg = b""
@@ -331,12 +333,9 @@ class SocketTCP:
 
     def segmento_go_back_n(self, data_window, i, largo_mensaje):
         # arma el segmento del elemento i de la ventana.
-        # el primer elemento de data_list es el INFO: lleva el largo total en el body (y en m_fin, como en Stop & Wait)
-        # y, a diferencia de Stop & Wait, sí ocupa bytes de secuencia. Si no los ocupara, su ACK tendría el mismo
-        # número que el último ACK del mensaje anterior y un ACK repetido de ese mensaje se confundiría con el del INFO
         data = data_window.get_data(i)
         seq = data_window.get_sequence_number(i)
-        es_info = (seq == data_window.initial_seq)
+        es_info = (seq == data_window.initial_seq) #si es el primer segmento entonces es el info
         pack = {
             b"m_type": (b"INFO" if es_info else b"DATA"),
             b"m_len": str(len(data)).encode(),
@@ -346,28 +345,61 @@ class SocketTCP:
         }
         return self.create_segment(pack)
 
+    def debug_congestion(self, evento, data_window):
+        # modo debug de la ventana de congestión: muestra cómo evolucionan el estado, cwnd, ssthresh y la ventana
+        if self.debug and self.congestion_control_on:
+            cc = self.congestion_controler
+            estado = "slow start" if cc.is_state_slow_start() else "congestion avoidance"
+            print(f"[DEBUG CC] {evento}: estado={estado}, cwnd={cc.get_cwnd()} B, ssthresh={cc.get_ssthresh()}, "
+                  f"window_size={data_window.window_size}")
+
+    def actualizar_window_size(self, data_window):
+        # tras un evento que pudo cambiar cwnd, la ventana pasa a tener tantos segmentos como MSS completos caben en cwnd.
+        # en congestion avoidance cwnd crece en fracciones de MSS, así que get_MSS_in_cwnd puede venir como float
+        if self.congestion_control_on:
+            data_window.update_window_size(max(1, int(self.congestion_controler.get_MSS_in_cwnd())))
+
     def send_using_go_back_n(self, message: bytes):
-        window_size = 8  # Parte 2: ventana fija de 8 segmentos
-        chunk_s = 16
+        mss = 8  # parte 3: trozos de MSS = 8 bytes
         fin = len(message)
 
-        # dividimos el mensaje en trozos de a lo más 16 bytes, igual que en Stop & Wait.
-        # el primer elemento es el INFO, con el largo del mensaje como datos
-        data_list = [str(fin).encode()] + [message[i:i + chunk_s] for i in range(0, fin, chunk_s)]
+        # dividimos el mensaje en trozos de a lo más MSS bytes.
+        data_list = [str(fin).encode()] + [message[i:i + mss] for i in range(0, fin, mss)]
+
+        # con control de congestión la ventana parte con cwnd = 1 MSS
+        # sino se mantiene la ventana fija de 8 segmentos de la Parte 2
+        self.congestion_controler = CongestionControl.CongestionControl(mss)
+        if self.congestion_control_on:
+            window_size = max(1, int(self.congestion_controler.get_MSS_in_cwnd()))
+        else:
+            window_size = 8
         data_window = SlidingWindowCC(window_size, data_list, self.sequence)
 
         if self.debug:
             print(f"[DEBUG] send_using_go_back_n: Enviando mensaje de largo {fin} al receptor {self.connection} en {len(data_list)} segmentos")
+        self.debug_congestion("inicio", data_window)
 
         self.socket_UDP.settimeout(self.timeout)
 
+        # seq del último elemento enviado: cuando la ventana avanza o crece, se envían (de forma consecutiva)
+        # justo los elementos que entraron a ella, que son los que tienen seq mayor a este
+        self.max_seq_enviado = -1
+
+        def enviar_elemento(i):
+            self.socket_UDP.sendto(self.segmento_go_back_n(data_window, i, fin), self.connection)
+            self.number_of_sent_segments += 1
+            self.max_seq_enviado = max(self.max_seq_enviado, data_window.get_sequence_number(i))
+
+        def enviar_nuevos():
+            for i in range(data_window.window_size):
+                if data_window.get_data(i) is not None and data_window.get_sequence_number(i) > self.max_seq_enviado:
+                    enviar_elemento(i)
+
         # enviamos toda la ventana inicial. Hay un solo timer (índice 0) para toda la ventana:
         # lo arranca el primer sendto y corresponde al segmento más antiguo sin confirmar
-        for i in range(window_size):
-            if data_window.get_data(i) is not None:
-                self.socket_UDP.sendto(self.segmento_go_back_n(data_window, i, fin), self.connection)
+        enviar_nuevos()
 
-        while data_window.get_data(0) is not None:
+        while data_window.get_data(0) is not None: #mientras el primer elemento de la ventana tenga datos
             try:
                 mensaje, server_address = self.socket_UDP.recvfrom(self.buffer_size)
                 r_dict = self.parse_segment(mensaje)
@@ -375,28 +407,41 @@ class SocketTCP:
                     continue
                 r_seq = int(r_dict[b"m_seq"].decode())
 
-                # los ACKs son acumulativos: confirman todos los elementos de la ventana que terminan antes de r_seq
-                k = 0
-                for i in range(window_size):
-                    data = data_window.get_data(i)
-                    if data is None or data_window.get_sequence_number(i) + len(data) > r_seq:
+                # los ACKs son acumulativos
+                # caso borde: si la ventana se achico justo después de enviar el último elemento de la ventana previa,
+                # puede llegar un ACK mayor al seq más grande de la ventana actual. Entonces movemos la ventana
+                # completa como si hubiese llegado su último elemento, y repetimos hasta que el ACK caiga dentro de ella
+                confirmados = 0
+                while data_window.get_data(0) is not None:
+                    k = 0
+                    for i in range(data_window.window_size):
+                        data = data_window.get_data(i)
+                        if data is None or data_window.get_sequence_number(i) + len(data) > r_seq:
+                            break
+                        k = i + 1
+                    if k == 0:
                         break
-                    k = i + 1
+                    data_window.move_window(k)
+                    confirmados += k
+                    if k < data_window.window_size:
+                        break
 
-                if k == 0:
+                if confirmados == 0:
                     # ACK repetido o atrasado: no confirma nada nuevo, seguimos esperando
                     if self.debug:
                         print(f"[DEBUG] send_using_go_back_n: ACK {r_seq} no avanza la ventana")
                     continue
 
                 if self.debug:
-                    print(f"[DEBUG] send_using_go_back_n: ACK {r_seq} confirma {k} segmento(s), movemos la ventana")
-                # paramos el timer del segmento confirmado, avanzamos y enviamos los k elementos que entraron a la ventana
+                    print(f"[DEBUG] send_using_go_back_n: ACK {r_seq} confirma {confirmados} segmento(s), movemos la ventana")
+                # paramos el timer del segmento confirmado
                 self.parar_timer()
-                data_window.move_window(k)
-                for i in range(window_size - k, window_size):
-                    if data_window.get_data(i) is not None:
-                        self.socket_UDP.sendto(self.segmento_go_back_n(data_window, i, fin), self.connection)
+                if self.congestion_control_on:
+                    self.congestion_controler.event_ack_received()
+                    self.actualizar_window_size(data_window)
+                    self.debug_congestion(f"ACK {r_seq}", data_window)
+                # enviamos los elementos que entraron a la ventana (por avanzar y/o por crecer)
+                enviar_nuevos()
                 # si quedan segmentos sin confirmar pero no se envió nada nuevo, el timer sigue corriendo por ellos
                 if data_window.get_data(0) is not None:
                     self.iniciar_timer()
@@ -404,11 +449,15 @@ class SocketTCP:
             except TimeoutError:
                 # Go-Back-N: se reenvía toda la ventana desde el segmento más antiguo sin confirmar
                 self.parar_timer()
+                if self.congestion_control_on:
+                    self.congestion_controler.event_timeout()
+                    self.actualizar_window_size(data_window)
+                    self.debug_congestion("timeout", data_window)
                 if self.debug:
                     print(f"[DEBUG] send_using_go_back_n: Timeout, reenviando la ventana desde seq {data_window.get_sequence_number(0)}")
-                for i in range(window_size):
-                    if data_window.get_data(i) is not None:
-                        self.socket_UDP.sendto(self.segmento_go_back_n(data_window, i, fin), self.connection)
+                # lo que quedó fuera de la ventana al achicarse se tendrá que volver a enviar cuando vuelva a entrar
+                self.max_seq_enviado = -1
+                enviar_nuevos()
 
         # todo confirmado: el timer ya no tiene nada que vigilar
         self.parar_timer()
@@ -533,7 +582,7 @@ class SocketTCP:
             # un INFO con seq menor al esperado es un reenvío del mensaje anterior (Go-Back-N reenvía la ventana
             # completa, que puede incluir el INFO si se perdieron todos los ACKs), no un mensaje nuevo
             if (b"INFO" == parsed[b"m_type"]) and (emi_addr == self.connection) and (int(parsed[b"m_seq"].decode()) >= self.sequence):
-                # guardamos el largo que tendrá, así como dejamos todo listo para la comunicación
+                # guardamos el largo que tendrá
                 self.tot = int(parsed[b"m_fin"].decode())
                 self.act_count = 0
                 # el INFO ocupa tantos bytes de secuencia como su body (el largo del mensaje escrito como texto)
@@ -553,7 +602,7 @@ class SocketTCP:
                 self.recv_close()
                 return None
             # DATA o INFO repetidos del mensaje anterior (se perdió nuestro ACK), o DATA que llegó antes que su INFO
-            # (se perdió el INFO): reenviamos el último ACK; el emisor reenviará la ventana al cumplirse su timeout
+            # (se perdió el INFO): reenviamos el último ACK. El emisor reenviará la ventana al cumplirse su timeout
             elif (emi_addr == self.connection) and (parsed[b"m_type"] in (b"DATA", b"INFO")):
                 if self.debug:
                     print("[DEBUG] Segmento fuera de recepción: reenviando el último ACK")
@@ -598,7 +647,7 @@ class SocketTCP:
                         self.act_count = None
                         break
                 else:
-                    # Go-Back-N: el receptor no guarda segmentos fuera de orden. Si es repetido (seq menor) o se perdió
+                    # Go Back N: el receptor no guarda segmentos fuera de orden. Si es repetido (seq menor) o se perdió
                     # uno anterior (seq mayor), se descarta y se reenvía el último ACK acumulativo
                     if self.debug:
                         print(f"[DEBUG] DATA fuera de orden (seq {int(msg_dict[b'm_seq'].decode())}, esperado {self.sequence}): reenviando el último ACK")
