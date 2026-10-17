@@ -11,6 +11,8 @@ Tareas del curso de Redes (CC4303). Todo está hecho en Python con la librería 
 | `No_orientados_Sockets (ex1)/` | Cliente y servidor con UDP (no orientado a conexión). Ejemplo básico. |
 | `Ejercicio_1/`                 | Servidor HTTP y proxy HTTP.                                           |
 | `Ejercicio_2/`                 | Resolver DNS.                                                         |
+| `Ejercicio_3/`                 | TCP simplificado sobre UDP con Stop & Wait.                           |
+| `Ejercicio_4/`                 | Go-Back-N y control de congestión (TCP Tahoe simplificado).           |
 
 
 ## Ejemplos básicos de sockets
@@ -146,6 +148,78 @@ python3 cliente.py localhost 8000 --perdidas --debug < ejemplo.txt
 python3 servidor.py --perdidas --loss=0.4 --timeout=1
 python3 cliente.py localhost 8000 --perdidas --loss=0.4 --timeout=1 < ejemplo.txt
 ```
+
+## Ejercicio 4: Go-Back-N y control de congestión
+
+Parte del código del Ejercicio 3, pero usa las clases `SocketUDP` (`socketUDP.py`) y `SlidingWindowCC` (`slidingWindowCC.py`) entregadas en u-cursos, sin modificarlas.
+
+- `CongestionControl.py`: clase `CongestionControl(MSS)` con slow start y congestion avoidance (Parte 1).
+- `SocketTCP.py`: `send` y `recv` reciben un `mode`, que puede ser `"stop_and_wait"` (por defecto) o `"go_back_n"`.
+  - Go-Back-N usa trozos de MSS = 8 bytes.
+  - Sin control de congestión, la ventana queda fija en 8 segmentos (Parte 2).
+  - Con `set_congestion_control(True)`, la ventana parte en 1 segmento y sigue a `cwnd` (Parte 3).
+
+### Test de `CongestionControl`
+
+```bash
+cd Ejercicio_4
+python3 CongestionControl_test.py
+```
+
+### Cliente y servidor
+
+Igual que en el Ejercicio 3: dos terminales, primero el servidor (escucha en `localhost:8000`, y se detiene con Ctrl+C), y el archivo entra por la entrada estándar.
+
+```bash
+cd Ejercicio_4
+
+# terminal 1
+python3 servidor.py --gbn
+
+# terminal 2
+python3 cliente.py localhost 8000 --gbn --cc < archivo.txt
+```
+
+Al terminar, el cliente imprime el tiempo de envío y, en Go-Back-N, cuántos segmentos de datos mandó (`number_of_sent_segments`). El cierre de la conexión tarda unos segundos más, porque el último ACK se reenvía 3 veces con un timeout entremedio.
+
+Flags (en `cliente.py` van siempre después de `localhost 8000`):
+
+| Flag | Dónde | Qué hace | Por defecto |
+|---|---|---|---|
+| `--gbn` | cliente **y** servidor | Usa Go-Back-N en vez de Stop & Wait. Tiene que ir en los dos lados, o no se entienden. | Stop & Wait |
+| `--cc` | cliente | Activa el control de congestión en Go-Back-N. Solo afecta a quien envía. Sin `--gbn` no hace nada. | Ventana fija de 8 |
+| `--perdidas` | cliente y servidor | Simula pérdidas con `perdidas.py`. Usarlo en ambos lados para tener pérdidas en las dos direcciones. | Sin pérdidas, timeout de 5 s |
+| `--loss=X` | junto a `--perdidas` | Tasa de pérdida entre 0 y 1. | `0.2` |
+| `--timeout=X` | junto a `--perdidas` | Timeout de reenvío en segundos. | `0.5` |
+| `--debug` | cliente y servidor | Muestra los mensajes `[DEBUG]`. Con `--cc`, el cliente además muestra `[DEBUG CC]` con el estado, `cwnd`, `ssthresh` y `window_size` en cada ACK y timeout. | Desactivado |
+
+```bash
+# Go-Back-N con ventana fija de 8 (Parte 2), con pérdidas
+python3 servidor.py --gbn --perdidas
+python3 cliente.py localhost 8000 --gbn --perdidas < archivo.txt
+
+# Go-Back-N con control de congestión (Parte 3), viendo cómo evoluciona la ventana
+python3 servidor.py --gbn --perdidas
+python3 cliente.py localhost 8000 --gbn --cc --debug --perdidas < archivo.txt
+```
+
+Para comparar con y sin control de congestión, transmite el mismo archivo 5 veces con `--cc` y 5 veces sin él, con pérdida 20% y timeout 0.5 s (los valores por defecto de `--perdidas`), y anota el tiempo y los segmentos que imprime el cliente.
+
+### Tests del paso 5 (`t_sv.py` / `t_client.py`)
+
+Prueban mensajes de 16 y 19 bytes, un `recv` con `buff_size` menor al mensaje y el cierre. Usan el puerto 5000 y aceptan los mismos flags (`--cc` y `--debug` solo en `t_client.py`).
+
+```bash
+cd Ejercicio_4
+
+# terminal 1
+python3 t_sv.py --gbn --perdidas
+
+# terminal 2
+python3 t_client.py --gbn --cc --perdidas
+```
+
+El servidor imprime `Test N: Passed` o `Test N: Failed` para cada uno de los 4 tests.
 
 ## Cómo correr el servidor en la VM (VirtualBox)
 
