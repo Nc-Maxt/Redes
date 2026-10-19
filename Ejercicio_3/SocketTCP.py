@@ -401,7 +401,6 @@ class SocketTCP:
                             #el server ya no respondera nada mas, por lo que el timeout se triggereara siempre
                             if self.debug:
                                 print("[DEBUG] Enviando ultimo ACK 3 veces, intento ", i+1)
-                            self.socket_UDP.recvfrom(self.buffer_size) 
                         except socket.timeout:
                             pass
                     self.socket_UDP.close()
@@ -451,7 +450,7 @@ class SocketTCP:
                 intentos += 1
                 pass
         if intentos == 3:
-            print("Error: No se recibió el ACK del cliente después de 3 intentos. Se asume que el cliente no recibió el FIN+ACK y se cierra la conexión")
+            print("Error: No se recibió el ACK del cliente después de 3 intentos. Se asume que el cliente ya cerró la conexión y se cierra aquí")
             self.socket_UDP.close()
         
 

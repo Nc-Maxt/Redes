@@ -36,4 +36,4 @@ while True:
             break
         message_received += chunk_i
 
-    print('Message received :', message_received)
+    print('Message received :', message_received.decode())
