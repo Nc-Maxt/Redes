@@ -21,18 +21,29 @@ def create_packet(parsed_IP_packet: Paquete) -> bytes:
     extended_packet = parsed_IP_packet.ip + parsed_IP_packet.puerto + parsed_IP_packet.mensaje
     return extended_packet
 
+# 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
+def check_routes(routes_file_name: str, destination_address: tuple[str, int]) -> tuple[str,int] | None:
+    with open(router_rutas_path, "r") as archivo:
+        router_rutas: str = archivo.read()
+        _, puerto = destination_address
+        for line in router_rutas:
+            lineas = line.split(" ")
+            rango = lineas[1:2]
+            if puerto in rango:
+               ip = lineas[3]
+               puerto_destino = int(lineas[4])
+               return (ip, puerto_destino)
+        return None
+
+
 if __name__ == "__main__":
     # 2. Recibir los args
     router_IP: str = sys.argv[1] #127.0.0.1
     router_puerto: int = int(sys.argv[2]) #8881
     router_rutas_path: str = sys.argv[3] #rutas_R1_v2
 
-    with open(router_rutas_path, "r") as archivo:
-        router_rutas: str = archivo.read()
-
     # Test
     print("Router iniciado con la IP ", router_IP, "en el puerto: ", router_puerto, "y su mapa de rutas: ", router_rutas_path)
-    print("Mapa de rutas: ", router_rutas.encode())
 
     # 3. Crear el socket UDP (no orientado a conexión)
     router_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -42,5 +53,20 @@ if __name__ == "__main__":
 
     while True:
         paquete, direccion = router_socket.recvfrom(1024)
+        data_packet = parse_packet(paquete)
         print("Paquete recibido: ", paquete, " con la direccion: ", direccion)
-        print(parse_packet(paquete), paquete)
+        print(data_packet, paquete)
+
+        paquete_ip:str = data_packet.ip.decode() #ip destino
+        destination_address:int = int(data_packet.puerto) #puerto destino
+
+        # 7. El router checkea si el paquete es para el
+        print("Checkeando si es para mí...")
+        if data_packet.puerto == router_puerto.to_bytes():
+            print(data_packet.mensaje)
+        else:
+            direccion_next_hop = check_routes(router_rutas_path, (paquete_ip,destination_address))
+            if direccion_next_hop is not None:
+                print(f"Redirigiendo paquete {paquete_ip} con destino final {destination_address} desde {router_puerto} hacia {direccion_next_hop}")
+            else:
+                print(f"No hay rutas hacia {destination_address} para paquete {paquete_ip}")
