@@ -43,3 +43,4 @@ if __name__ == "__main__":
     while True:
         paquete, direccion = router_socket.recvfrom(1024)
         print("Paquete recibido: ", paquete, " con la direccion: ", direccion)
+        print(parse_packet(paquete), paquete)
