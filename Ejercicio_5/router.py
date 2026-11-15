@@ -19,6 +19,20 @@ class Paquete:
     # body
     mensaje: str  # contenido, ej: "hola"
 
+
+class Ciclic_list:
+    def __init__(self, lst):
+        self.lst = lst
+        self.index = 0
+
+    def xqappend(self, item):
+        self.lst.append(item)
+
+    def next(self):
+        item = self.lst[self.index]
+        self.index = (self.index + 1) % len(self.lst)
+        return item
+
 class Router:
     def __init__(self, router_IP, router_puerto, router_rutas_path) -> None:
         self.ip: str = router_IP
@@ -48,6 +62,7 @@ class Router:
         for rango in rutas:
             if puerto >= rango[0] and puerto <= rango[1]:
                 round_robin = rutas[rango]
+                # Se obtiene la ruta a donde se debe realizar el salto
                 address_destino:tuple[str,int] = next(round_robin) #round robin
                 return address_destino
         return None
@@ -68,6 +83,8 @@ class Router:
                 if tupla_rango in diccionario_final:
                     diccionario_final[tupla_rango].append(next_hop)
                 else:
+                    # opcion con clases
+                    # diccionario_final[tupla_rango] = Ciclic_list([[next_hop]])
                     diccionario_final[tupla_rango] = [next_hop]
 
         #Luego hago un cycle sobre cada lista de cada rango
