@@ -35,16 +35,16 @@ def create_packet(parsed_IP_packet: Paquete) -> bytes:
 # 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
 def check_routes(routes_file_name: str, destination_address: tuple[str, int]) -> tuple[str,int] | None:
     with open(routes_file_name, "r") as archivo:
-        router_rutas: list[str] = archivo.read().split("\n")
+        router_rutas: list[str] = archivo.read().splitlines()
         _, puerto = destination_address
         for line in router_rutas:
-            #print(line)
-            linea = line.split(" ")
-            #print(linea)
-            rango = linea[1:3]
-            rango = map(int, rango)
-            #print(rango)
-            if puerto in rango:
+            # se ignoran las líneas vacías o con solo espacios
+            if line.strip() == "":
+                continue
+            linea = line.split()
+            rango_init = int(linea[1])
+            rango_fin = int(linea[2])
+            if puerto >= rango_init and puerto <= rango_fin:
                 ip = linea[3]
                 puerto_destino = int(linea[4])
                 return (ip, puerto_destino)
