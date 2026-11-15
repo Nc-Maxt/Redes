@@ -11,6 +11,7 @@ class Paquete:
     #body
     mensaje: bytes
 
+
 # Función para parsear el mensaje recibido y extraer los headers
 def parse_packet(IP_packet: bytes) -> Paquete:
     parsed_packet = Paquete(IP_packet[0:4], IP_packet[4:6], IP_packet[6:])
@@ -23,16 +24,20 @@ def create_packet(parsed_IP_packet: Paquete) -> bytes:
 
 # 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
 def check_routes(routes_file_name: str, destination_address: tuple[str, int]) -> tuple[str,int] | None:
-    with open(router_rutas_path, "r") as archivo:
-        router_rutas: str = archivo.read()
+    with open(routes_file_name, "r") as archivo:
+        router_rutas: list[str] = archivo.read().split("\n")
         _, puerto = destination_address
         for line in router_rutas:
-            lineas = line.split(" ")
-            rango = lineas[1:2]
+            #print(line)
+            linea = line.split(" ")
+            #print(linea)
+            rango = linea[1:3]
+            rango = map(int, rango)
+            #print(rango)
             if puerto in rango:
-               ip = lineas[3]
-               puerto_destino = int(lineas[4])
-               return (ip, puerto_destino)
+                ip = linea[3]
+                puerto_destino = int(linea[4])
+                return (ip, puerto_destino)
         return None
 
 
@@ -53,16 +58,17 @@ if __name__ == "__main__":
 
     while True:
         paquete, direccion = router_socket.recvfrom(1024)
+        print(paquete)
         data_packet = parse_packet(paquete)
         print("Paquete recibido: ", paquete, " con la direccion: ", direccion)
         print(data_packet, paquete)
 
         paquete_ip:str = data_packet.ip.decode() #ip destino
-        destination_address:int = int(data_packet.puerto) #puerto destino
+        destination_address:int = int.from_bytes(data_packet.puerto) #puerto destino
 
         # 7. El router checkea si el paquete es para el
         print("Checkeando si es para mí...")
-        if data_packet.puerto == router_puerto.to_bytes():
+        if destination_address == router_puerto:
             print(data_packet.mensaje)
         else:
             direccion_next_hop = check_routes(router_rutas_path, (paquete_ip,destination_address))
