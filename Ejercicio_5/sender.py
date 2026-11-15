@@ -20,7 +20,7 @@ mensaje_a_enviar: str = input("Mensaje a enviar: ")
 
 # La conversión a bytes la hace create_packet
 paquete_a_enviar = router.Paquete(IP_router_final, puerto_router_final, mensaje_a_enviar)
-paquete_bytes = router.create_packet(paquete_a_enviar)
+paquete_bytes = router.Router.create_packet(None, paquete_a_enviar)
 print("Enviando:", paquete_a_enviar, "->", paquete_bytes)
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
