@@ -52,7 +52,10 @@ casos += [
 ok = 0
 for archivo, puerto, esperado in casos:
     try:
-        obtenido = router.check_routes(archivo, (IP, puerto))
+        # check_routes ahora es un método: se crea un Router nuevo por caso
+        # (puerto propio irrelevante, no se abre socket) para que el estado
+        # del round-robin de un caso no afecte al siguiente.
+        obtenido = router.Router(IP, 0, archivo).check_routes(archivo, (IP, puerto))
     except Exception as e:
         obtenido = f"ERROR {type(e).__name__}: {e}"
 
