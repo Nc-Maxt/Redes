@@ -16,6 +16,7 @@ class Paquete:
     # header
     ip: str       # IP de destino final, ej: "127.0.0.1"
     puerto: int   # puerto de destino final, ej: 8882
+    ttl: int      # saltos restantes que le quedan al paquete entre 0 y 255
     # body
     mensaje: str  # contenido, ej: "hola"
 
@@ -45,15 +46,17 @@ class Router:
     def parse_packet(self, IP_packet: bytes) -> Paquete:
         ip = ".".join(str(b) for b in IP_packet[0:4])      # 4 bytes -> "a.b.c.d"
         puerto = int.from_bytes(IP_packet[4:6], "big")     # 2 bytes -> int
-        mensaje = IP_packet[6:].decode()                   # resto -> str
-        return Paquete(ip, puerto, mensaje)
+        ttl = IP_packet[6]                                 # 1 byte -> int
+        mensaje = IP_packet[7:].decode()                   # resto -> str
+        return Paquete(ip, puerto, ttl, mensaje)
 
     # Paquete -> bytes
     def create_packet(self, parsed_IP_packet: Paquete) -> bytes:
         ip_bytes = bytes(int(n) for n in parsed_IP_packet.ip.split("."))  # "a.b.c.d" -> 4 bytes
         puerto_bytes = parsed_IP_packet.puerto.to_bytes(2, "big")         # int -> 2 bytes
+        ttl_bytes = parsed_IP_packet.ttl.to_bytes(1, "big")               # int -> 1 byte
         mensaje_bytes = parsed_IP_packet.mensaje.encode()                 # str -> bytes
-        return ip_bytes + puerto_bytes + mensaje_bytes
+        return ip_bytes + puerto_bytes + ttl_bytes + mensaje_bytes
 
     # 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
     def check_routes(self, routes_file_name: str, destination_address: tuple[str, int]) -> tuple[str,int] | None:
@@ -111,6 +114,12 @@ if __name__ == "__main__":
 
     while True:
         paquete, direccion = router_socket.recvfrom(1024)
+
+        # primero revisamos si el ttl es >0
+        if paquete[6] <= 0:
+            print(f"Se recibió paquete {paquete} con TTL 0")
+            continue
+
         data_packet = router.parse_packet(paquete)
         print("Paquete recibido: ", data_packet, " desde: ", direccion)
 
@@ -124,6 +133,8 @@ if __name__ == "__main__":
             direccion_next_hop = router.check_routes(router_rutas_path, destination_address)
             if direccion_next_hop is not None:
                 print(f"redirigiendo paquete {paquete} con destino final {destination_address} desde {router.address} hacia {direccion_next_hop}")
+                # actualiuzamos el ttl del paquete antes de reenviarlo
+                data_packet.ttl -= 1
                 # forward: se envía con el mismo socket del router (no se hace bind de nuevo)
                 router_socket.sendto(router.create_packet(data_packet), direccion_next_hop)
             else:
