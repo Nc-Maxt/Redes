@@ -22,7 +22,7 @@ class Paquete:
     Offset: int   # sirve para identificar la posición del inicio de este mensaje relativo al datagrama original
     Flag: int     # sirve para indicar si este paquete es el último fragmento 0 o no 1 
     # body
-    mensaje: str  # contenido, ej: "hola"
+    mensaje: bytes  # contenido, ej: b"hola"
 
 class Router:
     def __init__(self, router_IP, router_puerto, router_rutas_path) -> None:
@@ -38,11 +38,11 @@ class Router:
         puerto = int.from_bytes(IP_packet[4:6], "big")     # 2 bytes -> int
         ttl = IP_packet[6]                                 # 1 byte -> int
         size = int.from_bytes(IP_packet[7:11], "big")      # 4 bytes -> int
-        Id = int.from_bytes(IP_packet[11:15], "big")       # 4 bytes -> int
-        Offset = int.from_bytes(IP_packet[15:19], "big")   # 4 bytes -> int
-        Flag = int.from_bytes(IP_packet[19:20], "big")     # 1 byte -> int
+        Id = int.from_bytes(IP_packet[11:13], "big")       # 2 bytes -> int
+        Offset = int.from_bytes(IP_packet[13:17], "big")   # 4 bytes -> int
+        Flag = int.from_bytes(IP_packet[17:18], "big")     # 1 byte -> int
 
-        mensaje = IP_packet[20:].decode()                   # resto -> str
+        mensaje = IP_packet[18:]                           # resto -> bytes
         return Paquete(ip, puerto, ttl, size, Id, Offset, Flag, mensaje)
 
     # Paquete -> bytes
@@ -51,11 +51,11 @@ class Router:
         puerto_bytes = parsed_IP_packet.puerto.to_bytes(2, "big")         # int -> 2 bytes
         ttl_bytes = parsed_IP_packet.ttl.to_bytes(1, "big")               # int -> 1 byte
         size_bytes = parsed_IP_packet.tamaño.to_bytes(4, "big")           # int -> 4 bytes
-        Id_bytes = parsed_IP_packet.Id.to_bytes(4, "big")                 # int -> 4 bytes
+        Id_bytes = parsed_IP_packet.Id.to_bytes(2, "big")                 # int -> 2 bytes
         Offset_bytes = parsed_IP_packet.Offset.to_bytes(4, "big")         # int -> 4 bytes
         Flag_bytes = parsed_IP_packet.Flag.to_bytes(1, "big")             # int -> 1 byte
 
-        mensaje_bytes = parsed_IP_packet.mensaje.encode()                 # str -> bytes
+        mensaje_bytes = parsed_IP_packet.mensaje                          # bytes -> bytes
         return ip_bytes + puerto_bytes + ttl_bytes + size_bytes + Id_bytes + Offset_bytes + Flag_bytes + mensaje_bytes
 
     # 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
@@ -101,11 +101,29 @@ class Router:
     def fragment_IP_packet(self, IP_packet, MTU):
         # Retorna lista que contiene los fragmentos del paquete IP original
         largo = IP_packet.tamaño
-        if largo+20 <= MTU:  # 20 es el tamaño del header IP
+        if largo+18 <= MTU:  # 18 es el tamaño del header IP
             return [IP_packet]
         else:
+            new_size = MTU - 18
+            num_fragmentos = largo // new_size
+            if largo % new_size != 0:
+                num_fragmentos += 1
             fragmentos = []
             offset = IP_packet.Offset
+            for i in range(num_fragmentos):
+                if i == num_fragmentos - 1:
+                    fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=largo - new_size * i, 
+                                       Id=IP_packet.Id, Offset=offset, Flag=IP_packet.Flag, mensaje=IP_packet.mensaje[i*new_size:])
+                    
+                else:
+                    fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=new_size, 
+                                   Id=IP_packet.Id, Offset=offset, Flag=1, mensaje=IP_packet.mensaje[i*new_size:(i+1)*new_size])
+                    offset += new_size
+                fragmentos.append(fragment)
+                
+            
+            return fragmentos
+
             
 
 
