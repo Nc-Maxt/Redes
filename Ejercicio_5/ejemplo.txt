@@ -1,0 +1,10 @@
+Este es un texto de ejemplo, generado para ser reutilizado en el ejercicio 5. 
+Contiene varias líneas de texto que serán enviadas desde el cliente
+hacia el servidor en trozos. Esta vez, los trozos son de a líneas completas, 
+y no de a lo más 16 bytes. 
+
+Posteriormente, estos paquetes viajan a través de los routers. Por ello podría llegar
+de forma desordenada, y con pérdida de información si el TTL de los paquetes llega a 0
+antes de llegar al destino final.
+
+Hay varias líneas en este archivo, con caracteres especiales y lineas vacías.
