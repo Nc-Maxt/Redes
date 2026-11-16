@@ -15,11 +15,12 @@ IP_router_final: str = sys.argv[1]        # IP de destino final (va en el header
 puerto_router_final: int = int(sys.argv[2])  # puerto de destino final (va en el header)
 IP_envío: str = sys.argv[3]               # IP del router al que se envía el paquete
 puerto_envío: int = int(sys.argv[4])      # puerto del router al que se envía el paquete
+ttl: int = int(sys.argv[5])               # ttl del paquete
 
 mensaje_a_enviar: str = input("Mensaje a enviar: ")
 
 # La conversión a bytes la hace create_packet
-paquete_a_enviar = router.Paquete(IP_router_final, puerto_router_final, mensaje_a_enviar)
+paquete_a_enviar = router.Paquete(IP_router_final, puerto_router_final, ttl, mensaje_a_enviar)
 paquete_bytes = router.Router.create_packet(None, paquete_a_enviar)
 print("Enviando:", paquete_a_enviar, "->", paquete_bytes)
 
