@@ -17,22 +17,12 @@ class Paquete:
     ip: str       # IP de destino final, ej: "127.0.0.1"
     puerto: int   # puerto de destino final, ej: 8882
     ttl: int      # saltos restantes que le quedan al paquete entre 0 y 255
+    tamaño: int   # tamaño del mensaje sin headers, usa 4 bytes fijo
+    Id: int       # sirve para identificar fragmentos de un mismo paquete Ip
+    Offset: int   # sirve para identificar la posición del inicio de este mensaje relativo al datagrama original
+    Flag: int     # sirve para indicar si este paquete es el último fragmento 0 o no 1 
     # body
     mensaje: str  # contenido, ej: "hola"
-
-
-class Ciclic_list:
-    def __init__(self, lst):
-        self.lst = lst
-        self.index = 0
-
-    def xqappend(self, item):
-        self.lst.append(item)
-
-    def next(self):
-        item = self.lst[self.index]
-        self.index = (self.index + 1) % len(self.lst)
-        return item
 
 class Router:
     def __init__(self, router_IP, router_puerto, router_rutas_path) -> None:
@@ -47,16 +37,26 @@ class Router:
         ip = ".".join(str(b) for b in IP_packet[0:4])      # 4 bytes -> "a.b.c.d"
         puerto = int.from_bytes(IP_packet[4:6], "big")     # 2 bytes -> int
         ttl = IP_packet[6]                                 # 1 byte -> int
-        mensaje = IP_packet[7:].decode()                   # resto -> str
-        return Paquete(ip, puerto, ttl, mensaje)
+        size = int.from_bytes(IP_packet[7:11], "big")      # 4 bytes -> int
+        Id = int.from_bytes(IP_packet[11:15], "big")       # 4 bytes -> int
+        Offset = int.from_bytes(IP_packet[15:19], "big")   # 4 bytes -> int
+        Flag = int.from_bytes(IP_packet[19:20], "big")     # 1 byte -> int
+
+        mensaje = IP_packet[20:].decode()                   # resto -> str
+        return Paquete(ip, puerto, ttl, size, Id, Offset, Flag, mensaje)
 
     # Paquete -> bytes
     def create_packet(self, parsed_IP_packet: Paquete) -> bytes:
         ip_bytes = bytes(int(n) for n in parsed_IP_packet.ip.split("."))  # "a.b.c.d" -> 4 bytes
         puerto_bytes = parsed_IP_packet.puerto.to_bytes(2, "big")         # int -> 2 bytes
         ttl_bytes = parsed_IP_packet.ttl.to_bytes(1, "big")               # int -> 1 byte
+        size_bytes = parsed_IP_packet.tamaño.to_bytes(4, "big")           # int -> 4 bytes
+        Id_bytes = parsed_IP_packet.Id.to_bytes(4, "big")                 # int -> 4 bytes
+        Offset_bytes = parsed_IP_packet.Offset.to_bytes(4, "big")         # int -> 4 bytes
+        Flag_bytes = parsed_IP_packet.Flag.to_bytes(1, "big")             # int -> 1 byte
+
         mensaje_bytes = parsed_IP_packet.mensaje.encode()                 # str -> bytes
-        return ip_bytes + puerto_bytes + ttl_bytes + mensaje_bytes
+        return ip_bytes + puerto_bytes + ttl_bytes + size_bytes + Id_bytes + Offset_bytes + Flag_bytes + mensaje_bytes
 
     # 6. Función para checkear la tabla de rutas e indicar la dirección del siguiente salto
     def check_routes(self, routes_file_name: str, destination_address: tuple[str, int]) -> tuple[str,int] | None:
