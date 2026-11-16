@@ -98,6 +98,16 @@ class Router:
             diccionario_final[range] = cycle(diccionario_final[range])
         return diccionario_final
 
+    def fragment_IP_packet(self, IP_packet, MTU):
+        # Retorna lista que contiene los fragmentos del paquete IP original
+        largo = IP_packet.tamaño
+        if largo+20 <= MTU:  # 20 es el tamaño del header IP
+            return [IP_packet]
+        else:
+            fragmentos = []
+            offset = IP_packet.Offset
+            
+
 
 if __name__ == "__main__":
     # 2. Recibir los args
