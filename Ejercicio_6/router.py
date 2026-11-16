@@ -66,9 +66,12 @@ class Router:
             if puerto >= rango[0] and puerto <= rango[1]:
                 round_robin = rutas[rango]
                 # Se obtiene la ruta a donde se debe realizar el salto
-                address_destino:tuple[str,int] = next(round_robin) #round robin
-                return address_destino
+                destino = next(round_robin) #round robin
+                address_destino:tuple[str,int] = (destino[0][0], destino[0][1])
+                mtu = destino[1]
+                return address_destino, mtu
         return None
+    
     # 8. Round robin
     # Funcion que recibe un path a un archivo con las rutas y devuelve un diccionario donde la llave
     # es cada rango y las llaves almacenan una lista de todos los destinos + el destino que le tocaria segun Round Robin
@@ -82,7 +85,7 @@ class Router:
                     continue
                 linea = line.split()
                 tupla_rango = (int(linea[1]), int(linea[2]))
-                next_hop = (linea[3], int(linea[4]))  # (IP, puerto) del siguiente salto
+                next_hop = [(linea[3], int(linea[4])), linea[5]]  # (IP, puerto) del siguiente salto
                 if tupla_rango in diccionario_final:
                     diccionario_final[tupla_rango].append(next_hop)
                 else:
@@ -130,7 +133,7 @@ if __name__ == "__main__":
         if destination_address == router.address:
             print(data_packet.mensaje)
         else:
-            direccion_next_hop = router.check_routes(router_rutas_path, destination_address)
+            direccion_next_hop, mtu_next_hop = router.check_routes(router_rutas_path, destination_address)
             if direccion_next_hop is not None:
                 print(f"redirigiendo paquete {paquete} con destino final {destination_address} desde {router.address} hacia {direccion_next_hop}")
                 # actualiuzamos el ttl del paquete antes de reenviarlo
