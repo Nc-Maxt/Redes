@@ -7,9 +7,9 @@ IP_packet_v1 = b'\x7f\x00\x00\x01"\xb1\x0d\x00\x00\x00\x06\x00\x01\x00\x00\x00\x
 
 print("el paquete parseado: ", r1.parse_packet(IP_packet_v1))
 
-fragment = r1.fragment_IP_packet(r1.parse_packet(IP_packet_v1), 30)
+fragment = router.fragment_IP_packet(r1.parse_packet(IP_packet_v1), 30)
 
-fragments = r1.fragment_IP_packet(r1.parse_packet(IP_packet_v1), 20)
+fragments = router.fragment_IP_packet(r1.parse_packet(IP_packet_v1), 20)
 
 print("MTU es más grande: ", fragment)
 print("MTU es más pequeño: ", fragments)

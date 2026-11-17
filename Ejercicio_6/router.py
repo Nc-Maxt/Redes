@@ -98,58 +98,54 @@ class Router:
             diccionario_final[range] = cycle(diccionario_final[range])
         return diccionario_final
 
-    def fragment_IP_packet(self, IP_packet, MTU):
-        # Retorna lista que contiene los fragmentos del paquete IP original
-        largo = IP_packet.tamaño
-        if largo+18 <= MTU:  # 18 es el tamaño del header IP
-            return [IP_packet]
-        else:
-            new_size = MTU - 18
-            num_fragmentos = largo // new_size
-            if largo % new_size != 0:
-                num_fragmentos += 1
-            fragmentos = []
-            offset = IP_packet.Offset
-            for i in range(num_fragmentos):
-                if i == num_fragmentos - 1:
-                    fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=largo - new_size * i, 
-                                       Id=IP_packet.Id, Offset=offset, Flag=IP_packet.Flag, mensaje=IP_packet.mensaje[i*new_size:])
-
-                else:
-                    fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=new_size, 
-                                   Id=IP_packet.Id, Offset=offset, Flag=1, mensaje=IP_packet.mensaje[i*new_size:(i+1)*new_size])
-                    offset += new_size
-                fragmentos.append(fragment)
-            return fragmentos
-
-    def reassemble_IP_packet(self, fragment_list):
-
-        if len(fragment_list) == 1:
-            pkg = fragment_list[0]
-            if (pkg.Flag == 0) and (pkg.Offset == 0):
-                return pkg
+def fragment_IP_packet(IP_packet, MTU):
+    # Retorna lista que contiene los fragmentos del paquete IP original
+    largo = IP_packet.tamaño
+    if largo+18 <= MTU:  # 18 es el tamaño del header IP
+        return [IP_packet]
+    else:
+        new_size = MTU - 18
+        num_fragmentos = largo // new_size
+        if largo % new_size != 0:
+            num_fragmentos += 1
+        fragmentos = []
+        offset = IP_packet.Offset
+        for i in range(num_fragmentos):
+            if i == num_fragmentos - 1:
+                fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=largo - new_size * i, 
+                                   Id=IP_packet.Id, Offset=offset, Flag=IP_packet.Flag, mensaje=IP_packet.mensaje[i*new_size:])
             else:
-                return None
+                fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=new_size, 
+                               Id=IP_packet.Id, Offset=offset, Flag=1, mensaje=IP_packet.mensaje[i*new_size:(i+1)*new_size])
+                offset += new_size
+            fragmentos.append(fragment)
+        return fragmentos
+
+def reassemble_IP_packet(fragment_list):
+
+    if len(fragment_list) == 1:
+        pkg = fragment_list[0]
+        if (pkg.Flag == 0) and (pkg.Offset == 0):
+            return pkg
         else:
-            # Ordenar los fragmentos por Offset
-            fragment_list.sort(key=lambda x: x.Offset)
-            if fragment_list[0].Offset != 0:
+            return None
+    else:
+        # Ordenar los fragmentos por Offset
+        fragment_list.sort(key=lambda x: x.Offset)
+        if fragment_list[0].Offset != 0:
+            return None
+        if fragment_list[-1].Flag != 0:
+            return None
+        # Verificar que los fragmentos estén completos y en orden
+        for i in range(len(fragment_list) - 1):
+            if fragment_list[i].Offset + fragment_list[i].tamaño != fragment_list[i + 1].Offset:
                 return None
-            if fragment_list[-1].Flag != 0:
-                return None
-            # Verificar que los fragmentos estén completos y en orden
-            for i in range(len(fragment_list) - 1):
-                if fragment_list[i].Offset + fragment_list[i].tamaño != fragment_list[i + 1].Offset:
-                    return None
-            
-            # Crear un nuevo paquete IP con los datos reensamblados
-            mensaje_reensamblado = b''.join([fragment.mensaje for fragment in fragment_list])
-            paquete_reensamblado = Paquete(ip=fragment_list[0].ip, puerto=fragment_list[0].puerto, ttl=fragment_list[0].ttl, tamaño=len(mensaje_reensamblado),
-                                           Id=fragment_list[0].Id, Offset=0, Flag=0, mensaje=mensaje_reensamblado)
-            return paquete_reensamblado
-
-
-            
+        
+        # Crear un nuevo paquete IP con los datos reensamblados
+        mensaje_reensamblado = b''.join([fragment.mensaje for fragment in fragment_list])
+        paquete_reensamblado = Paquete(ip=fragment_list[0].ip, puerto=fragment_list[0].puerto, ttl=fragment_list[0].ttl, tamaño=len(mensaje_reensamblado),
+                                       Id=fragment_list[0].Id, Offset=0, Flag=0, mensaje=mensaje_reensamblado)
+        return paquete_reensamblado    
 
 
 if __name__ == "__main__":
@@ -194,7 +190,7 @@ if __name__ == "__main__":
         else:
             direccion_next_hop, mtu_next_hop = router.check_routes(router_rutas_path, destination_address)
             if direccion_next_hop is not None:
-                fragmented_packets = router.fragment_IP_packet(data_packet, mtu_next_hop)
+                fragmented_packets = fragment_IP_packet(data_packet, mtu_next_hop)
                 for pkg in fragmented_packets:
                     print(f"redirigiendo paquete {pkg} con destino final {destination_address} desde {router.address} hacia {direccion_next_hop}")
                     # actualiuzamos el ttl del paquete antes de reenviarlo
