@@ -1,0 +1,13 @@
+#datos 1
+[Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=17, Id=1, Offset=0, Flag=1, mensaje=b'hola las veces qu'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=17, Id=1, Offset=17, Flag=1, mensaje=b'e se cuentan en l'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=17, Id=1, Offset=34, Flag=1, mensaje=b'a ola son muchas '), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=17, Id=1, Offset=51, Flag=1, mensaje=b'olas al decir hol'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=1, Id=1, Offset=68, Flag=0, mensaje=b'a')]
+
+#datos2
+[Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=12, Id=2, Offset=0, Flag=1, mensaje=b'como decir p'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=12, Id=2, Offset=12, Flag=1, mensaje=b'aralelepiped'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=12, Id=2, Offset=24, Flag=1, mensaje=b'o sin decir '), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=12, Id=2, Offset=36, Flag=1, mensaje=b'bipedo ni ni'), 
+Paquete(ip='127.0.0.1', puerto=8881, ttl=64, tamaño=5, Id=2, Offset=48, Flag=0, mensaje=b'ptero')]
