@@ -114,15 +114,40 @@ class Router:
                 if i == num_fragmentos - 1:
                     fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=largo - new_size * i, 
                                        Id=IP_packet.Id, Offset=offset, Flag=IP_packet.Flag, mensaje=IP_packet.mensaje[i*new_size:])
-                    
+
                 else:
                     fragment = Paquete(ip=IP_packet.ip, puerto=IP_packet.puerto, ttl=IP_packet.ttl, tamaño=new_size, 
                                    Id=IP_packet.Id, Offset=offset, Flag=1, mensaje=IP_packet.mensaje[i*new_size:(i+1)*new_size])
                     offset += new_size
                 fragmentos.append(fragment)
-                
-            
             return fragmentos
+
+    def reassemble_IP_packet(self, fragment_list):
+
+        if len(fragment_list) == 1:
+            pkg = fragment_list[0]
+            if (pkg.Flag == 0) and (pkg.Offset == 0):
+                return pkg
+            else:
+                return None
+        else:
+            # Ordenar los fragmentos por Offset
+            fragment_list.sort(key=lambda x: x.Offset)
+            if fragment_list[0].Offset != 0:
+                return None
+            if fragment_list[-1].Flag != 0:
+                return None
+            # Verificar que los fragmentos estén completos y en orden
+            for i in range(len(fragment_list) - 1):
+                if fragment_list[i].Offset + fragment_list[i].tamaño != fragment_list[i + 1].Offset:
+                    return None
+            
+            # Crear un nuevo paquete IP con los datos reensamblados
+            mensaje_reensamblado = b''.join([fragment.mensaje for fragment in fragment_list])
+            paquete_reensamblado = Paquete(ip=fragment_list[0].ip, puerto=fragment_list[0].puerto, ttl=fragment_list[0].ttl, tamaño=len(mensaje_reensamblado),
+                                           Id=fragment_list[0].Id, Offset=0, Flag=0, mensaje=mensaje_reensamblado)
+            return paquete_reensamblado
+
 
             
 
@@ -142,6 +167,7 @@ if __name__ == "__main__":
     router_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # hacer que escuche de forma bloqueante
     router_socket.bind(router.address)
+    router_dicc = {}
 
     while True:
         paquete, direccion = router_socket.recvfrom(1024)
@@ -159,14 +185,21 @@ if __name__ == "__main__":
         # 7. El router checkea si el paquete es para él.
         # Un router es el par (IP, puerto), así que se comparan ambos.
         if destination_address == router.address:
-            print(data_packet.mensaje)
+            if data_packet.Id not in router_dicc:
+                router_dicc[data_packet.Id] = []
+            else:
+                router_dicc[data_packet.Id].append(data_packet)
+            print(f"El paquete {data_packet} es para este router {router.address}")
+
         else:
             direccion_next_hop, mtu_next_hop = router.check_routes(router_rutas_path, destination_address)
             if direccion_next_hop is not None:
-                print(f"redirigiendo paquete {paquete} con destino final {destination_address} desde {router.address} hacia {direccion_next_hop}")
-                # actualiuzamos el ttl del paquete antes de reenviarlo
-                data_packet.ttl -= 1
-                # forward: se envía con el mismo socket del router (no se hace bind de nuevo)
-                router_socket.sendto(router.create_packet(data_packet), direccion_next_hop)
+                fragmented_packets = router.fragment_IP_packet(data_packet, mtu_next_hop)
+                for pkg in fragmented_packets:
+                    print(f"redirigiendo paquete {pkg} con destino final {destination_address} desde {router.address} hacia {direccion_next_hop}")
+                    # actualiuzamos el ttl del paquete antes de reenviarlo
+                    pkg.ttl -= 1
+                    # forward: se envía con el mismo socket del router (no se hace bind de nuevo)
+                    router_socket.sendto(router.create_packet(pkg), direccion_next_hop)
             else:
                 print(f"No hay rutas hacia {destination_address} para paquete {paquete}")
