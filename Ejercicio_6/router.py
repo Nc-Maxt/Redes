@@ -181,11 +181,16 @@ if __name__ == "__main__":
         # 7. El router checkea si el paquete es para él.
         # Un router es el par (IP, puerto), así que se comparan ambos.
         if destination_address == router.address:
+            print(f"El paquete {data_packet} es para este router {router.address}")
             if data_packet.Id not in router_dicc:
                 router_dicc[data_packet.Id] = []
-            else:
-                router_dicc[data_packet.Id].append(data_packet)
-            print(f"El paquete {data_packet} es para este router {router.address}")
+            
+            router_dicc[data_packet.Id].append(data_packet)
+
+            obtained = reassemble_IP_packet(router_dicc[data_packet.Id])
+            if obtained is not None:
+                print(f"Se reensambló el paquete original en el router {router.address} y su mensaje es {obtained.mensaje.decode('utf-8')}")
+                del router_dicc[data_packet.Id]
 
         else:
             direccion_next_hop, mtu_next_hop = router.check_routes(router_rutas_path, destination_address)
