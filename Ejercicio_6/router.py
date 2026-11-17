@@ -85,7 +85,7 @@ class Router:
                     continue
                 linea = line.split()
                 tupla_rango = (int(linea[1]), int(linea[2]))
-                next_hop = [(linea[3], int(linea[4])), linea[5]]  # (IP, puerto) del siguiente salto
+                next_hop = [(linea[3], int(linea[4])), int(linea[5])]  # (IP, puerto) del siguiente salto
                 if tupla_rango in diccionario_final:
                     diccionario_final[tupla_rango].append(next_hop)
                 else:
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         # 7. El router checkea si el paquete es para él.
         # Un router es el par (IP, puerto), así que se comparan ambos.
         if destination_address == router.address:
-            print(f"El paquete {data_packet} es para este router {router.address}")
+            print(f"El paquete es para este router {router.address}")
             if data_packet.Id not in router_dicc:
                 router_dicc[data_packet.Id] = []
             
