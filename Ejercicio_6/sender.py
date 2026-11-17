@@ -16,12 +16,13 @@ puerto_router_final: int = int(sys.argv[2])  # puerto de destino final (va en el
 IP_envío: str = sys.argv[3]               # IP del router al que se envía el paquete
 puerto_envío: int = int(sys.argv[4])      # puerto del router al que se envía el paquete
 ttl: int = int(sys.argv[5])               # ttl del paquete
+id: int = int(sys.argv[6])
+
 
 mensaje_a_enviar: str = input("Mensaje a enviar: ")
 
-id = 1
 offset = 0
-flag = 1
+flag = 0
 size = len(mensaje_a_enviar.encode())
 
 # La conversión a bytes la hace create_packet

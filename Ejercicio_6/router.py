@@ -174,7 +174,7 @@ if __name__ == "__main__":
             continue
 
         data_packet = router.parse_packet(paquete)
-        print("Paquete recibido: ", data_packet, " desde: ", direccion)
+        print("Paquete recibido desde: ", direccion)
 
         destination_address: tuple[str, int] = (data_packet.ip, data_packet.puerto)
 
