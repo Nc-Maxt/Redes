@@ -25,7 +25,7 @@ flag = 1
 size = len(mensaje_a_enviar.encode())
 
 # La conversión a bytes la hace create_packet
-paquete_a_enviar = router.Paquete(IP_router_final, puerto_router_final, ttl, size, id, offset, flag, mensaje_a_enviar)
+paquete_a_enviar = router.Paquete(IP_router_final, puerto_router_final, ttl, size, id, offset, flag, mensaje_a_enviar.encode())
 paquete_bytes = router.Router.create_packet(None, paquete_a_enviar)
 print("Enviando:", paquete_a_enviar, "->", paquete_bytes)
 
