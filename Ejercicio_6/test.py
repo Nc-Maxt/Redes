@@ -19,4 +19,4 @@ IP_packet_v2 = reassemble_IP_packet(fragment_list)
 print("el paquete reensamblado: ", IP_packet_v2)
 print("IP_packet_v1 = IP_packet_v2 ? {}".format(parsed_IP_packet == IP_packet_v2))
 
-print(len(b"Como decir paralelepipedo sin decir bipedo ni niptero?. O bien como se dice hipopotomonstrosesquipedaliofobia sin fobia, sin hipopotamo, ni monstruo? "))
+print(len(b"Como decir paralelepipedo sin bipedo ni niptero?. O bien, como se dice hipopotomonstrosesquipedaliofobia sin fobia y sin hipopotamo?"))
