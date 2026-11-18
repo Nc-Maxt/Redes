@@ -13,6 +13,8 @@ Tareas del curso de Redes (CC4303). Todo está hecho en Python con la librería 
 | `Ejercicio_2/`                 | Resolver DNS.                                                         |
 | `Ejercicio_3/`                 | TCP simplificado sobre UDP con Stop & Wait.                           |
 | `Ejercicio_4/`                 | Go-Back-N y control de congestión (TCP Tahoe simplificado).           |
+| `Ejercicio_5/`                 | Forwarding básico con Round Robin y TTL en los paquetes.              |
+| `Ejercicio_6/`                 | Fragmentación usando como base el código del ejercicio anterior.      |
 
 
 ## Ejemplos básicos de sockets
@@ -233,3 +235,116 @@ Para que el servidor sea alcanzable desde fuera de la VM (por ejemplo desde el n
 6. Desde el navegador de tu máquina host, entra a `http://IP_VM:8000` reemplazando IP_VM por la IP real.
 
 Para que el navegador use el proxy, hay que configurarlo en las opciones de red del navegador apuntando a `IP_VM` puerto `8000`.
+
+## Ejercicio 5: Forwarding, Round Robin y TTL
+
+Simula una red de routers ejecutando cada nodo como un proceso distinto en `localhost` sobre sockets UDP. Cada router lee su tabla de rutas al iniciar, al recibir paquetes que debe reenviar alterna entre los siguientes saltos por área usando `round-robin` (`itertools.cycle`), decrementa el `TTL` en cada reenvío y descarta paquetes si `TTL == 0` o si no encuentra ruta.
+
+El header del paquete ocupa **7 bytes** (`IP` 4 B + `Puerto` 2 B + `TTL` 1 B), seguido del mensaje:
+
+- `router.py`: implementa la clase `Router` (`map_routes`, `check_routes`, `parse_packet` y `create_packet`).
+- `sender.py`: envía un mensaje individual ingresado por teclado hacia un destino final a través de un primer salto.
+- `prueba_router.py`: lee `ejemplo.txt` línea por línea y envía cada línea como un paquete independiente.
+
+### Levantar la red y enviar mensajes
+
+Las tablas tienen formato `red/máscara puerto_inicio puerto_fin IP_siguiente_salto puerto_siguiente_salto`. Para levantar la red de 5 routers (`rutas_R1_v3.txt` a `rutas_R5_v3.txt`), abre 5 terminales:
+
+```bash
+cd Ejercicio_5
+
+# terminal 1 a 5 (una por router)
+python3 router.py 127.0.0.1 8881 rutas_R1_v3.txt
+python3 router.py 127.0.0.1 8882 rutas_R2_v3.txt
+python3 router.py 127.0.0.1 8883 rutas_R3_v3.txt
+python3 router.py 127.0.0.1 8884 rutas_R4_v3.txt
+python3 router.py 127.0.0.1 8885 rutas_R5_v3.txt
+```
+
+Para la red de 7 routers se usan las tablas `rutas_R0_v4.txt` a `rutas_R6_v4.txt` en los puertos `8880` a `8886`.
+
+En otra terminal, envía mensajes con `sender.py` o `prueba_router.py`:
+
+```bash
+# enviar un mensaje a R5 (8885) entrando por R1 (8881) con TTL 10 (pide el mensaje por teclado)
+python3 sender.py 127.0.0.1 8885 127.0.0.1 8881 10
+
+# enviar todas las líneas de ejemplo.txt ("IP;puerto;TTL" IP_inicial puerto_inicial)
+python3 prueba_router.py "127.0.0.1;8885;10" 127.0.0.1 8881
+```
+
+> Nota: `prueba_router.py` tiene fijo el nombre `ejemplo.txt`, así que debe ejecutarse desde `Ejercicio_5/`. Si no se tiene `typing_extensions` instalado, se debe utilizar con el entorno virtual `pip install typing_extensions`.
+
+### Router default y tests
+
+Las tablas terminan con una ruta default (`0` a `65535`) apuntando a `127.0.0.1:7000`. Puedes escuchar ahí con `netcat` y enviar a un puerto fuera de la red (ej. `9000`) para comprobar que el paquete sale hacia el router default:
+
+```bash
+# terminal extra (escucha como router default)
+nc -u -l 7000
+
+# enviar a destino fuera de la red
+python3 sender.py 127.0.0.1 9000 127.0.0.1 8881 10
+```
+
+Tests unitarios:
+
+```bash
+cd Ejercicio_5
+python3 test.py                  # verifica que parse_packet y create_packet sean inversas
+python3 test_checkout_routes.py  # verifica check_routes y casos borde en las tablas
+```
+
+## Ejercicio 6: Fragmentación y reensamblado IP
+
+Parte del código del Ejercicio 5 y agrega límites de **MTU** por enlace, fragmentación (incluyendo refragmentación en saltos intermedios si el siguiente enlace tiene un MTU menor) y reensamblado de paquetes por `Id` en el destino.
+
+El header crece a **18 bytes** para soportar fragmentación:
+
+| Campo | Tamaño | Bytes | Descripción |
+| :--- | :---: | :---: | :--- |
+| `IP` | 4 B | 0–3 | IP de destino final |
+| `Puerto` | 2 B | 4–5 | Puerto de destino final |
+| `TTL` | 1 B | 6 | Time To Live |
+| `tamaño` | 4 B | 7–10 | Largo en bytes del payload de este paquete |
+| `Id` | 2 B | 11–12 | Identificador del paquete original |
+| `Offset` | 4 B | 13–16 | Posición (en bytes) donde empieza este fragmento respecto al mensaje original |
+| `Flag` | 1 B | 17 | `1` si vienen más fragmentos; `0` si es el último o no está fragmentado |
+
+Principales cambios respecto al ejercicio anterior:
+
+- `router.py`: agrega `fragment_IP_packet(IP_packet, MTU)` y `reassemble_IP_packet(fragment_list)`. Las tablas de rutas incorporan una columna adicional al final con el `MTU` del enlace.
+- `sender.py`: recibe el `Id` del paquete como último argumento.
+
+### Ejecución y prueba de fragmentación
+
+Levanta los 5 routers en terminales separadas y envía paquetes indicando el `Id` al final:
+
+```bash
+cd Ejercicio_6
+
+# terminal 1 a 5
+python3 router.py 127.0.0.1 8881 rutas_R1_v3.txt
+python3 router.py 127.0.0.1 8882 rutas_R2_v3.txt
+python3 router.py 127.0.0.1 8883 rutas_R3_v3.txt
+python3 router.py 127.0.0.1 8884 rutas_R4_v3.txt
+python3 router.py 127.0.0.1 8885 rutas_R5_v3.txt
+
+# terminal 6: enviar paquete con TTL=10 e Id=347 (pide el mensaje por teclado)
+python3 sender.py 127.0.0.1 8881 127.0.0.1 8885 10 347
+```
+
+Para forzar fragmentación y refragmentación en cascada (paquete total de 150 bytes = 18 B de header + 132 B de mensaje), ingresa un texto de 132 caracteres cuando `sender.py` pida el mensaje, por ejemplo:
+
+```text
+Como decir paralelepipedo sin bipedo ni niptero?. O bien, como se dice hipopotomonstrosesquipedaliofobia sin fobia y sin hipopotamo?
+```
+
+### Tests
+
+```bash
+cd Ejercicio_6
+python3 test.py           # verifica ida y vuelta de parse/create y fragment/reassemble
+python3 test_fragment.py  # prueba fragmentación de un paquete de 24 B con MTU 30 y MTU 20
+python3 test_info.py      # simula recepción de fragmentos de 2 Ids distintos (ordenados, desordenados e intercalados)
+```
